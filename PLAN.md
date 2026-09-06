@@ -4,10 +4,10 @@ Completed:
 
 1. Phase 1: local enterprise after-sales business backend
 2. Phase 2: AI Agent runtime and LLM tool calling
+3. Phase 3: MCP server, client discovery, and Agent integration
 
 Later phases, intentionally out of scope:
 
-3. MCP integration
 4. Agent Skills
 5. Reliability controls
 6. Tracing

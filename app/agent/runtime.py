@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Protocol
 
 from app.agent.providers import LLMProvider, ProviderError
-from app.agent.tools import ToolRegistry
 from app.agent.types import AgentResult, ToolEvent
 
 
@@ -15,9 +14,15 @@ SYSTEM_PROMPT = (
 )
 
 
+class AgentTools(Protocol):
+    def schemas(self) -> list[dict[str, Any]]: ...
+
+    def execute(self, name: str, arguments: Any) -> dict[str, Any]: ...
+
+
 class AgentRuntime:
     def __init__(
-        self, provider: LLMProvider, tools: ToolRegistry, *, max_steps: int = 8
+        self, provider: LLMProvider, tools: AgentTools, *, max_steps: int = 8
     ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
