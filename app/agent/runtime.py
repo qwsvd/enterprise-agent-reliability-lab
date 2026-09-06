@@ -31,8 +31,12 @@ class AgentRuntime:
         self.max_steps = max_steps
 
     def run(self, task: str) -> AgentResult:
+        system_prompt = SYSTEM_PROMPT
+        context = getattr(self.tools, "context", None)
+        if callable(context):
+            system_prompt = f"{system_prompt}\n\n{context()}"
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": task},
         ]
         events: list[ToolEvent] = []
