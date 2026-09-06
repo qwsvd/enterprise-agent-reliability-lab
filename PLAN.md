@@ -10,9 +10,9 @@ Completed:
 6. Phase 6: OpenTelemetry Agent, provider, tool, MCP, Skill, and reliability tracing
 7. Phase 7: deterministic automated Agent evaluation and regression gates
 8. Phase 8: provider-neutral external benchmark boundary and τ³-bench adapter
+9. Phase 9: production FastAPI container and GitHub Actions CI
 
 Later phases, intentionally out of scope:
 
-9. Docker and CI
 10. Final documentation and demo
 
