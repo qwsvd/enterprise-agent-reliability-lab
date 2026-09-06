@@ -1,16 +1,18 @@
 # Delivery plan
 
-Phase 1 implements the local enterprise after-sales business backend.
+Completed:
+
+1. Phase 1: local enterprise after-sales business backend
+2. Phase 2: AI Agent runtime and LLM tool calling
 
 Later phases, intentionally out of scope:
 
-1. AI Agent and tool calling
-2. MCP integration
-3. Agent Skills
-4. Reliability controls
-5. Tracing
-6. Automated Agent evals
-7. Benchmark integration
-8. Docker and CI
-9. Final documentation and demo
+3. MCP integration
+4. Agent Skills
+5. Reliability controls
+6. Tracing
+7. Automated Agent evals
+8. Benchmark integration
+9. Docker and CI
+10. Final documentation and demo
 

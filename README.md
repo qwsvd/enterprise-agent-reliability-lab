@@ -1,6 +1,6 @@
 # Enterprise Agent Reliability Lab
 
-Phase 1 is a typed local after-sales backend for future AI agents. It models customers, orders, shipments, refunds, and support tickets with FastAPI, Pydantic, SQLAlchemy, and SQLite.
+This repository contains a typed local after-sales backend and a small LLM tool-calling agent built on FastAPI, Pydantic, SQLAlchemy, SQLite, and HTTPX. Phase 2 keeps the agent vendor-neutral and leaves MCP, Agent Skills, tracing, RAG, and later reliability work out of scope.
 
 ## Setup and run
 
@@ -30,10 +30,41 @@ Startup idempotently seeds customer `CUS-001`, order `ORD-1024` for `299.00 CNY`
 
 Shipments delayed at least 7 days may qualify. Orders can only be refunded once; the refund cannot exceed the order amount; and refunds above 1000 CNY require human approval. An identical idempotent retry returns the original refund, while reusing a key for another request is rejected.
 
+## Phase 2 architecture
+
+The agent implementation is split into small boundaries:
+
+- `app/agent/runtime.py`: bounded model/tool loop and conversation state
+- `app/agent/providers.py`: provider protocol, optional OpenAI-compatible client, and deterministic scripted provider
+- `app/agent/tools.py`: JSON schemas, Pydantic argument validation, tool dispatch, and structured errors
+- `app/agent/types.py`: typed model responses, tool calls, events, and run results
+- `app/services.py`: shared Phase 1 business rules used by both HTTP routes and agent tools
+
+The six available tools are `get_customer`, `get_order`, `get_shipping`, `get_refund_policy`, `create_refund`, and `create_support_ticket`.
+
+The representative workflow is:
+
+> The customer says order ORD-1024 has still not arrived after 10 days. Check the relevant customer, order, shipment and refund policy. If the order is eligible, issue the appropriate refund and create a support ticket. Then report what happened.
+
+The model decides which tools to call. The runtime validates and executes each call, adds structured results to the conversation, and continues until the model answers or the step limit is reached. Refund writes still go through the Phase 1 service, including eligibility, duplicate, amount, idempotency, and pending-approval behavior.
+
+## Optional real model
+
+Tests use `ScriptedProvider` and never need credentials or network access. To run against an OpenAI-compatible Chat Completions endpoint, configure values from `.env.example` in your shell:
+
+```bash
+export LLM_BASE_URL=https://api.openai.com/v1
+export LLM_API_KEY=your-runtime-key
+export LLM_MODEL=your-tool-calling-model
+after-sales-agent "Handle delayed order ORD-1024 and report the outcome."
+```
+
+On PowerShell, use `$env:NAME="value"` instead of `export`. The CLI creates and seeds the configured SQLite database before running. No real-model execution result is claimed by this repository.
+
 ## Test
 
 ```bash
 pytest
 ```
 
-Tests use isolated temporary databases.
+Tests use isolated temporary databases and the deterministic scripted provider, so the complete suite runs offline.

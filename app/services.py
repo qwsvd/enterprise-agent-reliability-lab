@@ -15,6 +15,21 @@ MINIMUM_DELAY_DAYS = 7
 HUMAN_APPROVAL_THRESHOLD = Decimal("1000.00")
 
 
+def get_refund_policy() -> dict[str, object]:
+    return {
+        "minimum_delay_days": MINIMUM_DELAY_DAYS,
+        "human_approval_threshold": HUMAN_APPROVAL_THRESHOLD,
+        "currency": "CNY",
+        "rules": [
+            "A shipment delayed by at least 7 days may qualify.",
+            "An already-refunded order cannot be refunded again.",
+            "The refund amount cannot exceed the order amount.",
+            "Refunds above 1000 CNY require human approval.",
+            "Refund creation requires an idempotency key.",
+        ],
+    }
+
+
 @dataclass(frozen=True)
 class ServiceError(Exception):
     status_code: int
