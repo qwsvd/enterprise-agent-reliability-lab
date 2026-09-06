@@ -31,6 +31,7 @@ after-sales-mcp-demo = "app.mcp_integration.demo:main"
 after-sales-skills-demo = "app.skills.demo:main"
 after-sales-tracing-demo = "app.tracing.demo:main"
 after-sales-eval = "app.evals.cli:main"
+after-sales-benchmark = "app.benchmarks.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

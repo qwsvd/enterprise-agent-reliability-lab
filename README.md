@@ -1,6 +1,6 @@
 # Enterprise Agent Reliability Lab
 
-This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, repository Agent Skills, provider-neutral reliability controls, OpenTelemetry tracing, and deterministic automated Agent evaluations. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, OpenTelemetry, and the open `SKILL.md` convention. Benchmark-provider integration, RAG, and later phases remain out of scope.
+This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, repository Agent Skills, provider-neutral reliability controls, OpenTelemetry tracing, deterministic automated Agent evaluations, and an external benchmark integration boundary. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, OpenTelemetry, and the open `SKILL.md` convention. RAG and later phases remain out of scope.
 
 ## Setup and run
 
@@ -277,6 +277,115 @@ pytest tests/test_evals.py
 ```
 
 The text report is intended for engineers; `--format json` emits the complete machine-readable result. A failed regression gate exits nonzero. All built-in cases use `ScriptedProvider`, in-process MCP, injected sleeping, in-memory tracing, and temporary databases, so no API key, external network, collector, or real wait is required.
+
+## Phase 8 external benchmark integration
+
+Phase 7 is this repository's deterministic regression suite: its cases, scripted
+provider behavior, service state, and gates are owned locally. Phase 8 adds a
+separate interoperability boundary for external benchmark tasks, execution, and
+results. It does not relabel local evals as external benchmark runs and never turns
+a process exit code into a score.
+
+The first adapter targets Sierra Research's maintained
+[τ³-bench implementation](https://github.com/sierra-research/tau2-bench). The
+repository and Python package retain the `tau2` name, while the current benchmark
+is branded τ³-bench. The legacy
+[tau-bench repository](https://github.com/sierra-research/tau-bench) is outdated.
+The adapter contract was reviewed against upstream `tau2` v1.0.1 and its current
+[task schema](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/data_model/tasks.py),
+[result schema](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/data_model/simulation.py),
+[evaluation semantics](https://github.com/sierra-research/tau2-bench/blob/main/docs/evaluation.md),
+and [CLI](https://github.com/sierra-research/tau2-bench/blob/main/docs/cli-reference.md).
+
+The implementation is intentionally small and provider-neutral:
+
+- `app/benchmarks/models.py` defines benchmark identity/version, domain, policy
+  metadata, tools, input, expected observable outcome, execution result, score,
+  outcome, errors, and aggregate report contracts.
+- `BenchmarkAdapter` is the provider-neutral task/result conversion interface.
+- `Tau3BenchmarkAdapter` maps the current upstream Task,
+  EnvironmentInfo/tool-signature, Results, SimulationRun, RewardInfo, and
+  termination fields without importing upstream code. Policy content is represented
+  by an identifier and SHA-256 digest, not copied into normalized records.
+- `ExternalProcessBenchmarkProvider` checks a separately installed executable and
+  executes an explicit argument vector without a shell. Execution and result import
+  remain separate; provider failures are typed.
+- `report_from_local_evals` projects Phase 7 output into the common report shape but
+  keeps the identity `after-sales-local-evals`, making its provenance unambiguous.
+
+Upstream v1.0.1 requires Python `>=3.12,<3.14`, while this project supports Python
+`>=3.11`. For that reason `tau2` is not a project dependency. Run it in its own
+compatible environment and import its JSON result here. This preserves this
+package's Python range and avoids pulling a large benchmark stack into the
+application.
+
+Upstream scoring is preserved: the final task reward is the product of components
+listed in `evaluation_criteria.reward_basis`, and success means reward is within
+`1e-6` of `1.0`. A task's `actions` are one reference trajectory used to derive a
+target database state; they are a hard call-sequence requirement only when `ACTION`
+is in the reward basis. The adapter records that distinction explicitly.
+
+```text
+Local deterministic evals                 External τ³ environment (Python 3.12)
+  -> AgentRuntime/Skill/MCP                  -> registered benchmark Agent
+  -> local regression report                -> tau2 run / upstream evaluator
+                                                -> official Results JSON
+                                                     -> Tau3BenchmarkAdapter
+                                                     -> normalized report
+```
+
+Inspect availability and the supported contract/runtime boundary:
+
+```bash
+after-sales-benchmark inspect
+after-sales-benchmark inspect --format json
+```
+
+Validate a task contract, validate imported results, or summarize results:
+
+```bash
+after-sales-benchmark validate-task path/to/task-contract.json
+after-sales-benchmark validate-results path/to/results-contract.json
+after-sales-benchmark summarize path/to/results-contract.json
+after-sales-benchmark summarize path/to/upstream-results.json --benchmark-version 1.0.1
+after-sales-benchmark summarize path/to/upstream-results.json --benchmark-version 1.0.1 --format json
+```
+
+The repository-owned `after-sales-benchmark/tau3-v1` task contract combines one
+upstream-shaped Task with its domain name, policy, and discovered tool definitions,
+because those pieces live in different upstream layers. A result contract adds
+explicit benchmark-version provenance around an upstream-shaped Results object.
+Raw Results are also accepted when `--benchmark-version` is supplied explicitly.
+
+To prepare—but not execute—an upstream command for an Agent implementation that
+has already been registered in a separately installed τ³ environment:
+
+```bash
+after-sales-benchmark command \
+  --domain retail \
+  --agent registered_agent \
+  --agent-llm provider/model \
+  --user-llm provider/model \
+  --save-to enterprise-agent-run
+```
+
+Follow the official upstream installation instructions in that separate Python
+3.12 environment, run the emitted `tau2 run` command there, and import the produced
+Results JSON here. The command subcommand reports `executed: false`; this repository
+does not claim a real run unless a real upstream result is supplied. It also does
+not claim that the existing AgentRuntime is registered in τ³ automatically—an
+upstream-compatible Agent factory must exist in the external environment.
+
+Focused tests use only small synthetic repository-owned contracts:
+
+```bash
+pytest tests/test_benchmarks.py
+```
+
+They require no dataset download, API key, external network, real LLM, Docker, or
+external benchmark installation. The fixtures are not official tasks or results
+and must never be presented as benchmark scores. See `THIRD_PARTY_NOTICES.md` for
+the upstream attribution and license boundary.
 
 ## Optional real model
 

@@ -1,0 +1,69 @@
+{
+  "contract_schema": "after-sales-benchmark/tau3-v1",
+  "benchmark_version": "1.0.1",
+  "domain": "retail",
+  "results": {
+    "timestamp": "2026-01-01T00:00:00Z",
+    "info": {
+      "git_commit": "synthetic-fixture-not-upstream",
+      "num_trials": 1,
+      "max_steps": 20,
+      "max_errors": 3,
+      "agent_info": {
+        "implementation": "synthetic_agent",
+        "llm": "scripted-provider"
+      },
+      "user_info": {
+        "implementation": "synthetic_user",
+        "llm": "scripted-provider"
+      },
+      "environment_info": {
+        "domain_name": "retail",
+        "policy": "Synthetic fixture policy.",
+        "tool_defs": {}
+      }
+    },
+    "tasks": [
+      {
+        "id": "synthetic-retail-contract-001",
+        "user_scenario": {"instructions": "Synthetic task."}
+      },
+      {
+        "id": "synthetic-retail-contract-002",
+        "user_scenario": {"instructions": "Synthetic task."}
+      }
+    ],
+    "simulations": [
+      {
+        "id": "synthetic-run-pass",
+        "task_id": "synthetic-retail-contract-001",
+        "duration": 1.25,
+        "termination_reason": "agent_stop",
+        "trial": 0,
+        "mode": "half_duplex",
+        "reward_info": {
+          "reward": 1.0,
+          "reward_basis": ["DB", "COMMUNICATE"],
+          "reward_breakdown": {"DB": 1.0, "COMMUNICATE": 1.0}
+        }
+      },
+      {
+        "id": "synthetic-run-fail",
+        "task_id": "synthetic-retail-contract-002",
+        "duration": 2.5,
+        "termination_reason": "max_steps",
+        "trial": 0,
+        "mode": "half_duplex",
+        "reward_info": {
+          "reward": 0.0,
+          "reward_basis": ["DB", "COMMUNICATE"],
+          "reward_breakdown": {"DB": 0.0, "COMMUNICATE": 1.0}
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "fixture": "repository-owned-synthetic-contract",
+    "official_result": false
+  }
+}
