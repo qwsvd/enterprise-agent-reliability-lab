@@ -1,6 +1,6 @@
 # Enterprise Agent Reliability Lab
 
-This repository contains a typed local after-sales backend and a small LLM tool-calling agent built on FastAPI, Pydantic, SQLAlchemy, SQLite, and HTTPX. Phase 2 keeps the agent vendor-neutral and leaves MCP, Agent Skills, tracing, RAG, and later reliability work out of scope.
+This repository contains a typed local after-sales backend, a small LLM tool-calling agent, and an official-SDK MCP integration built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, and MCP Python SDK v2. Agent Skills, tracing, RAG, and later reliability work remain out of scope.
 
 ## Setup and run
 
@@ -48,6 +48,42 @@ The representative workflow is:
 
 The model decides which tools to call. The runtime validates and executes each call, adds structured results to the conversation, and continues until the model answers or the step limit is reached. Refund writes still go through the Phase 1 service, including eligibility, duplicate, amount, idempotency, and pending-approval behavior.
 
+## Phase 3 MCP architecture
+
+Phase 2 executes `ToolRegistry` directly. Phase 3 adds a protocol boundary without replacing that local path:
+
+- `app/mcp_integration/server.py` uses the official SDK v2 `MCPServer` and exposes the same six typed business tools.
+- MCP handlers delegate to the existing `ToolRegistry`, which delegates writes and policy decisions to the Phase 1 service layer.
+- `app/mcp_integration/client.py` uses the official high-level `Client` to discover tools with `tools/list` and invoke them with `tools/call`.
+- `MCPToolAdapter` converts the discovered names, descriptions, and input schemas into the existing AgentRuntime tool interface. It does not hard-code the six schemas.
+- Tests use the SDK's in-process client/server connection. The local demo uses the SDK's stdio transport and negotiates protocol behavior through the SDK.
+
+```text
+User task
+  -> AgentRuntime
+  -> MCP-discovered tool schema
+  -> MCP client
+  -> MCP server
+  -> existing Phase 1 ToolRegistry/service layer
+  -> SQLite database
+  -> structured MCP result
+  -> AgentRuntime
+```
+
+Start the stdio MCP server for a local MCP client or inspector:
+
+```bash
+after-sales-mcp-server
+```
+
+Run the fully local deterministic MCP Agent demonstration. It launches the real MCP server over stdio, uses `ScriptedProvider` instead of a paid model, and creates a temporary database unless `--database-url` is supplied:
+
+```bash
+after-sales-mcp-demo
+```
+
+The integration is tested against this repository's server and official SDK client paths. Interoperability with external MCP hosts is not claimed.
+
 ## Optional real model
 
 Tests use `ScriptedProvider` and never need credentials or network access. To run against an OpenAI-compatible Chat Completions endpoint, configure values from `.env.example` in your shell:
@@ -67,4 +103,4 @@ On PowerShell, use `$env:NAME="value"` instead of `export`. The CLI creates and 
 pytest
 ```
 
-Tests use isolated temporary databases and the deterministic scripted provider, so the complete suite runs offline.
+Tests use isolated temporary databases, the official SDK's in-process MCP path, mocked HTTP where needed, and the deterministic scripted provider. The complete suite runs without external network access, an API key, or a paid model.
