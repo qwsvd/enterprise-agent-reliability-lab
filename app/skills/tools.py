@@ -27,9 +27,13 @@ class SkillAwareTools:
     def schemas(self) -> list[dict[str, Any]]:
         return [*self.business_tools.schemas(), self._load_skill_schema()]
 
-    def execute(self, name: str, arguments: Any) -> dict[str, Any]:
+    def execute(
+        self, name: str, arguments: Any, *, timeout_seconds: float | None = None
+    ) -> dict[str, Any]:
         if name != "load_skill":
-            return self.business_tools.execute(name, arguments)
+            return self.business_tools.execute(
+                name, arguments, timeout_seconds=timeout_seconds
+            )
         if not isinstance(arguments, dict) or set(arguments) != {"name"}:
             return self._failure("invalid_skill_arguments", "load_skill requires only a name")
         skill_name = arguments.get("name")

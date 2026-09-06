@@ -2,9 +2,11 @@ import json
 from copy import deepcopy
 from typing import Any
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 
-from app.agent.providers import OpenAICompatibleProvider
+from app.agent.providers import OpenAICompatibleProvider, ProviderError
 from app.agent.runtime import AgentRuntime
 from app.agent.tools import ToolRegistry
 
@@ -93,3 +95,21 @@ def test_runtime_sends_valid_tool_result_in_second_openai_request(
     assert tool_message["tool_call_id"] == "call-1"
     assert json.loads(tool_message["content"])["data"]["code"] == "ORD-1024"
     assert "name" not in tool_message
+
+
+def test_openai_compatible_timeout_is_typed_and_retryable(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def timeout_post(url: str, **kwargs: Any) -> FakeResponse:
+        captured.update({"url": url, **kwargs})
+        raise httpx.ReadTimeout("deadline", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr("app.agent.providers.httpx.post", timeout_post)
+    provider = OpenAICompatibleProvider(api_key="test-only-key", model="test-model")
+
+    with pytest.raises(ProviderError) as raised:
+        provider.complete([], [], timeout_seconds=1.25)
+
+    assert raised.value.kind == "provider_timeout"
+    assert raised.value.retryable is True
+    assert captured["timeout"] == 1.25

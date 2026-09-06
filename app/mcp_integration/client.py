@@ -56,19 +56,42 @@ class MCPToolAdapter:
             for tool in self._tools.values()
         ]
 
-    async def _call(self, name: str, arguments: dict[str, Any]) -> Any:
-        async with Client(self.server, raise_exceptions=False) as client:
-            return await client.call_tool(name, arguments=arguments)
+    async def _call(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        timeout_seconds: float | None,
+    ) -> Any:
+        if timeout_seconds is None:
+            async with Client(self.server, raise_exceptions=False) as client:
+                return await client.call_tool(name, arguments=arguments)
+        with anyio.fail_after(timeout_seconds):
+            async with Client(self.server, raise_exceptions=False) as client:
+                return await client.call_tool(name, arguments=arguments)
 
-    def execute(self, name: str, arguments: Any) -> dict[str, Any]:
+    def execute(
+        self, name: str, arguments: Any, *, timeout_seconds: float | None = None
+    ) -> dict[str, Any]:
         if name not in self._tools:
             return self._failure("unknown_mcp_tool", f"Unknown MCP tool: {name}")
         if not isinstance(arguments, dict):
             return self._failure("invalid_arguments", "MCP tool arguments must be an object")
         try:
-            result = anyio.run(self._call, name, arguments)
+            result = anyio.run(self._call, name, arguments, timeout_seconds)
+        except TimeoutError:
+            return self._failure(
+                "tool_timeout",
+                f"MCP tool {name} exceeded its timeout",
+                retryable=True,
+                ambiguous=True,
+            )
         except Exception as exc:
-            return self._failure("mcp_connection_or_protocol_error", str(exc))
+            return self._failure(
+                "mcp_connection_or_protocol_error",
+                str(exc),
+                retryable=True,
+                ambiguous=True,
+            )
         if result.is_error:
             message = "\n".join(
                 block.text for block in result.content if isinstance(block, TextContent)
@@ -84,6 +107,17 @@ class MCPToolAdapter:
         return self._failure("malformed_mcp_result", "MCP structured result has an invalid shape")
 
     @staticmethod
-    def _failure(kind: str, message: str) -> dict[str, Any]:
-        return {"ok": False, "error": {"type": kind, "message": message}}
+    def _failure(
+        kind: str,
+        message: str,
+        *,
+        retryable: bool = False,
+        ambiguous: bool = False,
+    ) -> dict[str, Any]:
+        error: dict[str, Any] = {"type": kind, "message": message}
+        if retryable:
+            error["retryable"] = True
+        if ambiguous:
+            error["ambiguous"] = True
+        return {"ok": False, "error": error}
 

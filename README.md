@@ -1,6 +1,6 @@
 # Enterprise Agent Reliability Lab
 
-This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, and repository Agent Skills. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, and the open `SKILL.md` convention. Tracing, RAG, and later reliability work remain out of scope.
+This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, repository Agent Skills, and provider-neutral reliability controls. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, and the open `SKILL.md` convention. Tracing, RAG, and later phases remain out of scope.
 
 ## Setup and run
 
@@ -135,6 +135,56 @@ after-sales-skills-demo
 ```
 
 The demo uses `ScriptedProvider`, loads `delayed-order-resolution` through `load_skill`, discovers business tools from the MCP server, and uses a temporary SQLite database. It requires no API key or external network.
+
+## Phase 5 reliability controls
+
+Reliability controls are runtime execution guards and recovery policy. They make failure behavior bounded and inspectable without moving refund or ticket rules out of the service layer. `ReliabilityConfig` supplies conservative defaults and can be replaced per run.
+
+- **Execution budgets:** defaults allow 8 Agent steps, 12 provider calls, and 32 actual tool executions. Provider and tool retries consume their corresponding call budget. The runtime checks a budget before every attempt and returns the exact exhausted-budget reason without making the next call.
+- **Provider retry:** only `ProviderError` values explicitly marked retryable are retried. The default is at most 3 attempts with bounded exponential backoff. Permanent authentication, request, or malformed-response failures stop immediately.
+- **Timeouts:** the default provider and tool deadlines are 30 seconds. The runtime passes the provider deadline through `LLMProvider`; the OpenAI-compatible provider applies it to HTTPX. It passes the tool deadline to the MCP adapter, which applies an AnyIO cancellation scope. Timeout results are typed and never silently ignored.
+- **Tool retry:** retry requires an explicit `retryable: true` error. Validation errors, unknown tools, malformed results, skill-loading errors, business-rule rejection, and MCP tool rejection are permanent. Read-only calls may retry; idempotency-keyed `create_refund` may retry because the existing service provides a strong guarantee.
+- **Side-effect safety:** `create_support_ticket` has no idempotency contract. An ambiguous retryable failure therefore terminates as `unsafe_retry_blocked`; the runtime never replays it automatically. No ticket idempotency was invented for this phase.
+- **Loop protection:** after 3 successful, validated executions of the same canonical tool name and arguments, the next identical request is blocked as `repeated_tool_call`. The threshold is configurable and independent of the step budget.
+- **Failure budget:** 3 consecutive failed provider/tool attempts terminate by default. Any successful operation resets the consecutive count. Total failure records remain available in the result.
+
+`AgentResult` retains the existing status, response, steps, and tool events while adding `termination_reason`, `model_calls`, `tool_calls`, `retries`, `failures`, `consecutive_failures`, and typed `failure_details`.
+
+A business rejection is an authoritative domain outcome for the model to handle, not a transient infrastructure failure. Likewise, `pending_human_approval` is a valid successful tool result: it is not retried, is not counted as a reliability failure, and must not be described as completed.
+
+```text
+User task
+  -> AgentRuntime
+  -> reliability policy
+  -> optional selected Skill
+  -> MCP-discovered tool
+  -> retry / timeout / repetition guard
+  -> MCP server
+  -> service layer
+  -> SQLite
+  -> structured result
+  -> reliability accounting
+  -> AgentRuntime
+  -> final response or typed terminal outcome
+```
+
+The separation remains precise:
+
+- **Reliability control:** runtime execution guard and recovery policy.
+- **Skill:** reusable workflow guidance, progressively loaded only when selected.
+- **Tool:** executable capability.
+- **MCP:** protocol and capability-discovery boundary.
+- **Service layer:** authoritative business rules.
+- **Tracing:** a later phase and not implemented here.
+
+Run the deterministic reliability scenarios and the normal Skill + MCP demonstration:
+
+```bash
+pytest tests/test_reliability.py
+python -m app.skills.demo
+```
+
+The reliability tests inject scripted failures and a sleeper, so retry and timeout coverage uses no network and performs no real waiting.
 
 ## Optional real model
 

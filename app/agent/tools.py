@@ -89,7 +89,9 @@ class ToolRegistry:
     def schemas(self) -> list[dict[str, Any]]:
         return [spec.schema() for spec in self._specs.values()]
 
-    def execute(self, name: str, arguments: Any) -> dict[str, Any]:
+    def execute(
+        self, name: str, arguments: Any, *, timeout_seconds: float | None = None
+    ) -> dict[str, Any]:
         spec = self._specs.get(name)
         if spec is None:
             return self._failure("unknown_tool", f"Unknown tool: {name}")
@@ -109,10 +111,21 @@ class ToolRegistry:
             return self._failure("tool_execution_error", str(exc))
 
     @staticmethod
-    def _failure(kind: str, message: str, details: Any = None) -> dict[str, Any]:
+    def _failure(
+        kind: str,
+        message: str,
+        details: Any = None,
+        *,
+        retryable: bool = False,
+        ambiguous: bool = False,
+    ) -> dict[str, Any]:
         error: dict[str, Any] = {"type": kind, "message": message}
         if details is not None:
             error["details"] = details
+        if retryable:
+            error["retryable"] = True
+        if ambiguous:
+            error["ambiguous"] = True
         return {"ok": False, "error": error}
 
     def _customer(self, request: ToolInput) -> dict[str, Any]:
