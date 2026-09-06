@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from opentelemetry.trace import Tracer
 from pydantic import BaseModel, ConfigDict, ValidationError
+
+from app.tracing import get_tracer, mark_failure, mark_success
 
 
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -55,8 +58,9 @@ class Skill(BaseModel):
 
 
 class SkillRegistry:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, tracer: Tracer | None = None) -> None:
         self.root = Path(root).resolve()
+        self.tracer = get_tracer(tracer)
         self._metadata: dict[str, SkillMetadata] = {}
         self._loaded: dict[str, Skill] = {}
         self._discovered = False
@@ -65,7 +69,34 @@ class SkillRegistry:
     def loaded_names(self) -> tuple[str, ...]:
         return tuple(self._loaded)
 
+    @property
+    def discovered(self) -> bool:
+        return self._discovered
+
+    def set_tracer(self, tracer: Tracer) -> None:
+        self.tracer = tracer
+
     def discover(self) -> list[SkillMetadata]:
+        with self.tracer.start_as_current_span(
+            "skill.discovery",
+            attributes={"skill.operation": "discover"},
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                metadata = self._discover()
+            except SkillError as exc:
+                mark_failure(span, type(exc).__name__)
+                raise
+            except Exception:
+                mark_failure(span, "skill_discovery_internal_error")
+                raise
+            span.set_attribute("skill.count", len(metadata))
+            span.set_attribute("skill.names", [item.name for item in metadata])
+            mark_success(span)
+            return metadata
+
+    def _discover(self) -> list[SkillMetadata]:
         if not self.root.exists() or not self.root.is_dir():
             raise SkillDirectoryError(f"Skill directory not found: {self.root}")
 
@@ -92,12 +123,32 @@ class SkillRegistry:
         return list(self._metadata.values())
 
     def load(self, name: str) -> Skill:
+        with self.tracer.start_as_current_span(
+            "skill.load",
+            attributes={"skill.operation": "load"},
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                skill, cache_hit = self._load(name)
+            except SkillError as exc:
+                mark_failure(span, type(exc).__name__)
+                raise
+            except Exception:
+                mark_failure(span, "skill_load_internal_error")
+                raise
+            span.set_attribute("skill.name", skill.metadata.name)
+            span.set_attribute("skill.cache_hit", cache_hit)
+            mark_success(span)
+            return skill
+
+    def _load(self, name: str) -> tuple[Skill, bool]:
         if "/" in name or "\\" in name or name in {".", ".."}:
             raise UnsafeSkillPathError(f"Unsafe skill name: {name}")
         if not self._discovered:
             raise SkillDirectoryError("Skills have not been discovered")
         if name in self._loaded:
-            return self._loaded[name]
+            return self._loaded[name], True
         metadata = self._metadata.get(name)
         if metadata is None:
             raise UnknownSkillError(f"Unknown skill: {name}")
@@ -112,7 +163,7 @@ class SkillRegistry:
             raise SkillMetadataError(f"Skill {name} has no instructions")
         skill = Skill(metadata=metadata, instructions=instructions)
         self._loaded[name] = skill
-        return skill
+        return skill, False
 
     def _ensure_safe(self, path: Path) -> None:
         try:

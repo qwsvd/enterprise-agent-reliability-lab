@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from opentelemetry.trace import Tracer
+
 from app.agent.runtime import AgentTools
 from app.skills.loader import SkillError, SkillRegistry
 
@@ -12,11 +14,33 @@ class SkillAwareTools:
     def __init__(self, business_tools: AgentTools, skills: SkillRegistry) -> None:
         self.business_tools = business_tools
         self.skills = skills
-        self._catalog = skills.catalog()
-        if any(item["function"]["name"] == "load_skill" for item in business_tools.schemas()):
+        self._catalog = skills.catalog() if skills.discovered else []
+        self._prepared = False
+
+    def set_tracer(self, tracer: Tracer) -> None:
+        self.skills.set_tracer(tracer)
+        setter = getattr(self.business_tools, "set_tracer", None)
+        if callable(setter):
+            setter(tracer)
+
+    def prepare(self) -> None:
+        if self._prepared:
+            return
+        if not self.skills.discovered:
+            self.skills.discover()
+        prepare_business = getattr(self.business_tools, "prepare", None)
+        if callable(prepare_business):
+            prepare_business()
+        self._catalog = self.skills.catalog()
+        if any(
+            item["function"]["name"] == "load_skill"
+            for item in self.business_tools.schemas()
+        ):
             raise ValueError("Business tool name conflicts with load_skill")
+        self._prepared = True
 
     def context(self) -> str:
+        self.prepare()
         lines = [
             "Available Agent Skills (metadata only; full instructions are not loaded):"
         ]
@@ -25,6 +49,7 @@ class SkillAwareTools:
         return "\n".join(lines)
 
     def schemas(self) -> list[dict[str, Any]]:
+        self.prepare()
         return [*self.business_tools.schemas(), self._load_skill_schema()]
 
     def execute(
