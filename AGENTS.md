@@ -7,7 +7,8 @@
   provider-neutral execution guards in `app/reliability/`. Phase 6 adds vendor-neutral
   OpenTelemetry instrumentation and local test setup in `app/tracing/`. Phase 7 adds
   deterministic end-to-end evals in `app/evals/`. Phase 8 adds the provider-neutral
-  external benchmark boundary and τ³ adapter in `app/benchmarks/`.
+  external benchmark boundary and τ³ adapter in `app/benchmarks/`. Phase 9 adds a
+  multi-stage, non-root FastAPI image and GitHub Actions validation.
 - Keep routes in `app/api.py`, contracts in `app/schemas.py`, persistence in `app/models.py`, and business rules in `app/services.py`.
 - Add pytest coverage for every behavior change and use `Decimal` for money.
 - Preserve refund idempotency. Never add secrets, local databases, caches, or fabricated results.
@@ -42,6 +43,10 @@
   as an official score. Preserve upstream grading semantics.
 - Keep τ³-bench outside this project's dependency environment because its current
   official `tau2` package has a narrower Python range. Never vendor its source or data.
-- Do not add RAG, multi-agent systems, a frontend, Docker, CI, deployment, or
-  later-phase infrastructure yet.
+- Keep the production container limited to the FastAPI application, run it as the
+  numeric non-root user, and persist its default SQLite database under `/data`.
+- Keep CI least-privileged, pin third-party actions to immutable commit SHAs, install
+  from `pyproject.toml`, and run deterministic tests without credentials or services.
+- Do not add RAG, multi-agent systems, a frontend, deployment, or later-phase
+  infrastructure yet.
 - Preserve third-party licenses and attribution when reusing external code.

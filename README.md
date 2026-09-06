@@ -387,6 +387,42 @@ external benchmark installation. The fixtures are not official tasks or results
 and must never be presented as benchmark scores. See `THIRD_PARTY_NOTICES.md` for
 the upstream attribution and license boundary.
 
+## Phase 9 Docker and CI
+
+Phase 9 adds a production-oriented container for the FastAPI business backend and
+continuous validation for the complete Phase 1–8 system. It does not add deployment
+infrastructure or put an external benchmark runtime in the application image.
+
+The Dockerfile uses a Python 3.11 slim builder to resolve and build wheels, then
+installs those wheels into a separate slim runtime. The runtime contains no compiler,
+runs as numeric user and group `10001:10001`, persists the default SQLite database at
+`/data/after_sales.db`, and includes a health check against `GET /health`. The build
+context is allowlisted in `.dockerignore`, so local environment files, credentials,
+databases, Git metadata, tests, caches, and generated output are not sent to the build.
+
+Build and run the API locally:
+
+```bash
+docker build --pull -t enterprise-agent-reliability-lab .
+docker run --rm -p 8000:8000 \
+  -v after-sales-data:/data \
+  enterprise-agent-reliability-lab
+curl http://localhost:8000/health
+```
+
+On PowerShell, place the `docker run` command on one line or use PowerShell's line
+continuation syntax. Override `DATABASE_URL` at runtime if another SQLite location is
+needed. Supply any optional LLM credentials only as runtime environment variables;
+they are neither required by the API nor copied into the image.
+
+`.github/workflows/ci.yml` runs on pull requests targeting `main` and pushes to
+`main`. It tests the supported Python range (3.11–3.14), installs the package and its
+development extra from `pyproject.toml`, runs `pip check`, executes the complete
+pytest suite, validates core imports, and builds a wheel. After those jobs pass, CI
+builds the production image and verifies both its non-root user and application
+import. The workflow has read-only repository permissions, disables persisted Git
+credentials, and pins third-party actions to immutable commit SHAs.
+
 ## Optional real model
 
 Tests use `ScriptedProvider` and never need credentials or network access. To run against an OpenAI-compatible Chat Completions endpoint, configure values from `.env.example` in your shell:

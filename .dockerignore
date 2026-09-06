@@ -1,0 +1,11 @@
+# Send only files required to build the application wheel. Local credentials,
+# databases, test output, Git metadata, and development artifacts stay outside
+# the Docker build context by default.
+*
+!app/
+!app/**
+!pyproject.toml
+!README.md
+!LICENSE
+!Dockerfile
+!.dockerignore
