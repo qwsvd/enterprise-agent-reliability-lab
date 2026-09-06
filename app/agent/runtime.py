@@ -73,7 +73,6 @@ class AgentRuntime:
                     {
                         "role": "tool",
                         "tool_call_id": call.id,
-                        "name": call.name,
                         "content": json.dumps(result, default=str),
                     }
                 )
