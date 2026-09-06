@@ -6,6 +6,9 @@ from typing import Any
 import anyio
 from mcp import Client
 from mcp.types import TextContent, Tool
+from opentelemetry.trace import Tracer
+
+from app.tracing import get_tracer, mark_failure, mark_success, safe_identifier
 
 
 class MCPClientError(RuntimeError):
@@ -15,10 +18,18 @@ class MCPClientError(RuntimeError):
 class MCPToolAdapter:
     """Adapt MCP-discovered tools to the synchronous Phase 2 tool interface."""
 
-    def __init__(self, server: Any) -> None:
+    def __init__(self, server: Any, *, tracer: Tracer | None = None) -> None:
         self.server = server
+        self.tracer = get_tracer(tracer)
         self.protocol_version: str | None = None
         self._tools: dict[str, Tool] = {}
+
+    def set_tracer(self, tracer: Tracer) -> None:
+        self.tracer = tracer
+
+    def prepare(self) -> None:
+        if not self._tools:
+            self.discover()
 
     async def _discover(self) -> tuple[list[Tool], str]:
         discovered: list[Tool] = []
@@ -33,13 +44,23 @@ class MCPToolAdapter:
             return discovered, str(client.protocol_version)
 
     def discover(self) -> list[dict[str, Any]]:
-        try:
-            tools, protocol_version = anyio.run(self._discover)
-        except Exception as exc:
-            raise MCPClientError(f"MCP tool discovery failed: {exc}") from exc
-        self._tools = {tool.name: tool for tool in tools}
-        self.protocol_version = protocol_version
-        return self.schemas()
+        with self.tracer.start_as_current_span(
+            "mcp.discovery",
+            attributes={"mcp.operation": "tools/list"},
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                tools, protocol_version = anyio.run(self._discover)
+            except Exception as exc:
+                mark_failure(span, "mcp_connection_or_protocol_error", retryable=True)
+                raise MCPClientError(f"MCP tool discovery failed: {exc}") from exc
+            self._tools = {tool.name: tool for tool in tools}
+            self.protocol_version = protocol_version
+            span.set_attribute("mcp.tool.count", len(tools))
+            span.set_attribute("mcp.protocol.version", safe_identifier(protocol_version))
+            mark_success(span)
+            return self.schemas()
 
     def schemas(self) -> list[dict[str, Any]]:
         if not self._tools:
@@ -70,6 +91,33 @@ class MCPToolAdapter:
                 return await client.call_tool(name, arguments=arguments)
 
     def execute(
+        self, name: str, arguments: Any, *, timeout_seconds: float | None = None
+    ) -> dict[str, Any]:
+        attributes: dict[str, str | float] = {
+            "mcp.operation": "tools/call",
+            "tool.name": safe_identifier(name) if name in self._tools else "unknown",
+        }
+        if timeout_seconds is not None:
+            attributes["operation.timeout.seconds"] = timeout_seconds
+        with self.tracer.start_as_current_span(
+            "mcp.call",
+            attributes=attributes,
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            result = self._execute(name, arguments, timeout_seconds=timeout_seconds)
+            if result.get("ok") is True:
+                mark_success(span)
+            else:
+                error = result.get("error", {})
+                mark_failure(
+                    span,
+                    safe_identifier(error.get("type", "mcp_tool_error")),
+                    retryable=error.get("retryable") is True,
+                )
+            return result
+
+    def _execute(
         self, name: str, arguments: Any, *, timeout_seconds: float | None = None
     ) -> dict[str, Any]:
         if name not in self._tools:

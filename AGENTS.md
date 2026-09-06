@@ -4,7 +4,8 @@
   single-agent tool-calling runtime in `app/agent/`. Phase 3 adds official SDK v2
   MCP server/client integration in `app/mcp_integration/`. Phase 4 adds repository
   Agent Skills in `.agents/skills` and loading code in `app/skills/`. Phase 5 adds
-  provider-neutral execution guards in `app/reliability/`.
+  provider-neutral execution guards in `app/reliability/`. Phase 6 adds vendor-neutral
+  OpenTelemetry instrumentation and local test setup in `app/tracing/`.
 - Keep routes in `app/api.py`, contracts in `app/schemas.py`, persistence in `app/models.py`, and business rules in `app/services.py`.
 - Add pytest coverage for every behavior change and use `Decimal` for money.
 - Preserve refund idempotency. Never add secrets, local databases, caches, or fabricated results.
@@ -23,7 +24,12 @@
   they must not use network access or real waits.
 - Business rejection and `pending_human_approval` are domain outcomes, not retryable
   infrastructure failures.
-- Do not add tracing, telemetry, RAG, multi-agent systems, a frontend,
+- Keep traces payload-free: record operation names, safe categories, attempts, counters,
+  and outcomes, but never prompts, messages, tool arguments/results, business identifiers,
+  PII, credentials, endpoints, authorization data, or exception messages.
+- Keep OpenTelemetry tracer injection optional and vendor-neutral. Tests must use the
+  isolated in-memory exporter and must not require a collector or network.
+- Do not add automated evals, benchmark integration, RAG, multi-agent systems, a frontend,
   Docker, or later-phase infrastructure yet.
 - Preserve third-party licenses and attribution when reusing external code.
 
