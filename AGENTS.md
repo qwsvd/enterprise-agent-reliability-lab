@@ -5,8 +5,7 @@
   MCP server/client integration in `app/mcp_integration/`. Phase 4 adds repository
   Agent Skills in `.agents/skills` and loading code in `app/skills/`. Phase 5 adds
   provider-neutral execution guards in `app/reliability/`. Phase 6 adds vendor-neutral
-  OpenTelemetry instrumentation and local test setup in `app/tracing/`. Phase 7 adds
-  deterministic case-driven evaluation and regression gates in `app/evals/`.
+  OpenTelemetry instrumentation and local test setup in `app/tracing/`.
 - Keep routes in `app/api.py`, contracts in `app/schemas.py`, persistence in `app/models.py`, and business rules in `app/services.py`.
 - Add pytest coverage for every behavior change and use `Decimal` for money.
 - Preserve refund idempotency. Never add secrets, local databases, caches, or fabricated results.
