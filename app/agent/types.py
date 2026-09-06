@@ -31,6 +31,7 @@ class AgentResult(BaseModel):
     ]
     response: str
     steps: int
+    run_id: str | None = None
     tool_events: list[ToolEvent] = Field(default_factory=list)
     termination_reason: TerminationReason | None = None
     model_calls: int = 0

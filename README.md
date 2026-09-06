@@ -1,6 +1,6 @@
 # Enterprise Agent Reliability Lab
 
-This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, repository Agent Skills, and provider-neutral reliability controls. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, and the open `SKILL.md` convention. Tracing, RAG, and later phases remain out of scope.
+This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, repository Agent Skills, provider-neutral reliability controls, and OpenTelemetry tracing. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, OpenTelemetry, and the open `SKILL.md` convention. RAG and later phases remain out of scope.
 
 ## Setup and run
 
@@ -186,6 +186,52 @@ python -m app.skills.demo
 
 The reliability tests inject scripted failures and a sleeper, so retry and timeout coverage uses no network and performs no real waiting.
 
+## Phase 6 OpenTelemetry tracing
+
+Tracing is a separate infrastructure layer around Agent, reliability, MCP, and Skill operations. It does not change business decisions or duplicate service logic. A tracer can be injected into `AgentRuntime`; when none is supplied, the OpenTelemetry API uses the process-configured provider or a no-op provider.
+
+One run produces this hierarchy:
+
+```text
+agent.run
+  -> skill.discovery
+  -> mcp.discovery                       # when discovery occurs during preparation
+  -> agent.step                          # one per logical Agent step
+       -> agent.provider.call            # one per provider attempt
+       -> reliability.retry              # one per actual retry/backoff
+       -> agent.tool.call                # one per actual tool attempt
+            -> skill.load                # for load_skill
+            -> mcp.call                  # for MCP tools/call
+```
+
+Normal OpenTelemetry span timing supplies duration. Structured attributes cover the generated run ID, step, provider class and configured model name, safe tool/Skill names, MCP operation and protocol version, attempt/retry number, success/failure classification, refund completion status, terminal reason, and final counters. Root `agent.terminated` and sanitized `reliability.failure` events make completion and retry decisions reconstructable.
+
+Trace data deliberately excludes prompts, assistant responses, tool arguments and results, customer/order identifiers, email addresses, idempotency keys, API keys, credentials, endpoint authorization, and exception messages. Failures are represented by typed categories and retryability only. `pending_human_approval` is recorded as a successful business result with `business.refund.completed=false`, not as infrastructure failure.
+
+`create_in_memory_tracing()` creates an isolated `TracerProvider`, `SimpleSpanProcessor`, and `InMemorySpanExporter` without changing global OpenTelemetry state. It is used by tests and the deterministic local demo; no collector or network is required.
+
+```text
+User task
+  -> agent.run
+  -> reliability-controlled Agent step
+  -> optional progressively loaded Skill
+  -> MCP-discovered tool
+  -> MCP server
+  -> authoritative service layer
+  -> SQLite
+  -> structured result and sanitized trace outcome
+  -> final response or typed terminal reason
+```
+
+Run the deterministic tracing demo and focused tests:
+
+```bash
+after-sales-tracing-demo
+pytest tests/test_tracing.py
+```
+
+The demo prints only the sanitized in-memory span hierarchy and reliability counters. Exporter/collector deployment is intentionally not configured in this phase.
+
 ## Optional real model
 
 Tests use `ScriptedProvider` and never need credentials or network access. To run against an OpenAI-compatible Chat Completions endpoint, configure values from `.env.example` in your shell:
@@ -205,4 +251,4 @@ On PowerShell, use `$env:NAME="value"` instead of `export`. The CLI creates and 
 pytest
 ```
 
-Tests use isolated temporary databases, the official SDK's in-process MCP path, mocked HTTP where needed, and the deterministic scripted provider. The complete suite runs without external network access, an API key, or a paid model.
+Tests use isolated temporary databases, the official SDK's in-process MCP path, an in-memory OpenTelemetry exporter, mocked HTTP where needed, and the deterministic scripted provider. The complete suite runs without external network access, an API key, a telemetry collector, or a paid model.
