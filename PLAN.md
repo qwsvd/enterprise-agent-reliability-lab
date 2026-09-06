@@ -9,10 +9,10 @@ Completed:
 5. Phase 5: execution budgets, bounded retries, timeouts, and loop/side-effect guards
 6. Phase 6: OpenTelemetry Agent, provider, tool, MCP, Skill, and reliability tracing
 7. Phase 7: deterministic automated Agent evaluation and regression gates
+8. Phase 8: provider-neutral external benchmark boundary and τ³-bench adapter
 
 Later phases, intentionally out of scope:
 
-8. Benchmark integration
 9. Docker and CI
 10. Final documentation and demo
 

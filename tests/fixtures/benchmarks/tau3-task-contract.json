@@ -1,0 +1,61 @@
+{
+  "contract_schema": "after-sales-benchmark/tau3-v1",
+  "benchmark_version": "1.0.1",
+  "domain": "retail",
+  "policy": "Synthetic fixture policy: use tools and preserve customer state.",
+  "tool_definitions": {
+    "lookup_case": {
+      "name": "lookup_case",
+      "doc": "Read a synthetic case.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "case_id": {"type": "string"}
+        },
+        "required": ["case_id"]
+      },
+      "returns": {"type": "object"}
+    },
+    "update_case": {
+      "name": "update_case",
+      "doc": "Update a synthetic case.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "case_id": {"type": "string"},
+          "state": {"type": "string"}
+        },
+        "required": ["case_id", "state"]
+      },
+      "returns": {"type": "object"}
+    }
+  },
+  "task": {
+    "id": "synthetic-retail-contract-001",
+    "description": {
+      "purpose": "Exercise the repository-owned adapter contract."
+    },
+    "user_scenario": {
+      "persona": "Synthetic test user",
+      "instructions": "Ask for a synthetic case update."
+    },
+    "ticket": "Synthetic support request.",
+    "evaluation_criteria": {
+      "actions": [
+        {
+          "action_id": "synthetic-1",
+          "name": "update_case",
+          "arguments": {"case_id": "fixture-1", "state": "resolved"}
+        }
+      ],
+      "env_assertions": [],
+      "communicate_info": ["resolved"],
+      "nl_assertions": [],
+      "reward_basis": ["DB", "COMMUNICATE"]
+    }
+  },
+  "metadata": {
+    "fixture": "repository-owned-synthetic-contract",
+    "official_result": false
+  }
+}
