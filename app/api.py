@@ -6,8 +6,8 @@ from app.schemas import (
     RefundPolicyResponse, RefundResponse, ShipmentResponse, TicketCreate, TicketResponse,
 )
 from app.services import (
-    HUMAN_APPROVAL_THRESHOLD, MINIMUM_DELAY_DAYS, ServiceError,
-    create_refund, create_ticket, get_customer, get_order,
+    ServiceError, create_refund, create_ticket, get_customer, get_order,
+    get_refund_policy,
 )
 
 router = APIRouter()
@@ -65,18 +65,7 @@ def shipping(order_code: str, session: Session = Depends(get_session)) -> Shipme
 
 @router.get("/policies/refund", response_model=RefundPolicyResponse)
 def policy() -> RefundPolicyResponse:
-    return RefundPolicyResponse(
-        minimum_delay_days=MINIMUM_DELAY_DAYS,
-        human_approval_threshold=HUMAN_APPROVAL_THRESHOLD,
-        currency="CNY",
-        rules=[
-            "A shipment delayed by at least 7 days may qualify.",
-            "An already-refunded order cannot be refunded again.",
-            "The refund amount cannot exceed the order amount.",
-            "Refunds above 1000 CNY require human approval.",
-            "Refund creation requires an idempotency key.",
-        ],
-    )
+    return RefundPolicyResponse.model_validate(get_refund_policy())
 
 
 @router.post("/refunds", response_model=RefundResponse, status_code=201)
