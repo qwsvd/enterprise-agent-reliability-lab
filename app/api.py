@@ -42,7 +42,8 @@ def order(order_code: str, session: Session = Depends(get_session)) -> OrderResp
         raise _error(exc) from exc
     return OrderResponse(
         code=item.code, customer_code=item.customer.code, amount=item.amount,
-        currency=item.currency, status=item.status, refunded=item.refund is not None,
+        currency=item.currency, status=item.status,
+        refunded=item.refund is not None and item.refund.status == "approved",
         created_at=item.created_at,
     )
 
@@ -110,4 +111,3 @@ def ticket(request: TicketCreate, session: Session = Depends(get_session)) -> Ti
         description=item.description, priority=item.priority, status=item.status,
         created_at=item.created_at,
     )
-

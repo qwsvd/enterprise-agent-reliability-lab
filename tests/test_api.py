@@ -147,8 +147,8 @@ def test_refund_above_threshold_requires_human_approval(client: TestClient) -> N
     )
     assert response.status_code == 201
     assert response.json()["status"] == "pending_human_approval"
+    assert client.get("/orders/ORD-1024").json()["refunded"] is False
 
 
 def test_refund_requires_idempotency_key(client: TestClient) -> None:
     assert client.post("/refunds", json=refund_payload()).status_code == 422
-
