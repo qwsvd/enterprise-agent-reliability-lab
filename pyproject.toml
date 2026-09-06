@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "enterprise-agent-reliability-lab"
-version = "0.3.0"
+version = "0.4.0"
 description = "Local after-sales business backend for enterprise agent reliability experiments"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,6 +14,7 @@ dependencies = [
   "httpx>=0.27,<1.0",
   "mcp>=2.1,<3.0",
   "pydantic>=2.9,<3.0",
+  "pyyaml>=6.0,<7.0",
   "sqlalchemy>=2.0,<3.0",
   "uvicorn[standard]>=0.30,<1.0",
 ]
@@ -25,6 +26,7 @@ dev = ["pytest>=8.3,<9.0"]
 after-sales-agent = "app.agent.cli:main"
 after-sales-mcp-server = "app.mcp_integration.server:main"
 after-sales-mcp-demo = "app.mcp_integration.demo:main"
+after-sales-skills-demo = "app.skills.demo:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

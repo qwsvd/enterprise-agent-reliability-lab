@@ -1,6 +1,6 @@
 # Enterprise Agent Reliability Lab
 
-This repository contains a typed local after-sales backend, a small LLM tool-calling agent, and an official-SDK MCP integration built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, and MCP Python SDK v2. Agent Skills, tracing, RAG, and later reliability work remain out of scope.
+This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, and repository Agent Skills. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, and the open `SKILL.md` convention. Tracing, RAG, and later reliability work remain out of scope.
 
 ## Setup and run
 
@@ -83,6 +83,58 @@ after-sales-mcp-demo
 ```
 
 The integration is tested against this repository's server and official SDK client paths. Interoperability with external MCP hosts is not claimed.
+
+## Phase 4 Agent Skills
+
+An Agent Skill is a version-controlled, reusable workflow. Repository skills live at `.agents/skills/<skill-name>/SKILL.md` and use YAML frontmatter followed by concise procedural instructions:
+
+```markdown
+---
+name: example-skill
+description: Explain when this workflow should be selected.
+---
+
+Workflow instructions...
+```
+
+`SkillRegistry` discovers and validates only lightweight `name`, `description`, and file-location metadata at first. `SkillAwareTools` adds a `load_skill` capability to the existing tool set. Only when the model selects that capability does the registry read the selected complete `SKILL.md`; the resulting instructions remain in the conversation for the rest of that run. Other skill bodies are not preloaded.
+
+The repository includes:
+
+- `delayed-order-resolution`: inspect a delayed order, consult authoritative policy, use refund and ticket tools, and report the exact outcome.
+- `high-value-refund-escalation`: preserve human-approval behavior and distinguish pending, approved, rejected, and failed states.
+
+The boundaries are deliberate:
+
+- **Skill:** reusable workflow and instructions.
+- **Tool:** executable capability such as looking up an order or creating a refund.
+- **MCP:** protocol and discovery boundary for those executable capabilities.
+- **Service layer:** authoritative business rules and state changes.
+
+Skills do not contain executable refund thresholds, mutate the database, or replace service validation.
+
+```text
+User task
+  -> AgentRuntime
+  -> skill metadata catalog
+  -> selected SKILL.md
+  -> skill-guided reasoning
+  -> MCP-discovered business tools
+  -> MCP server
+  -> existing service layer
+  -> SQLite database
+  -> tool results
+  -> AgentRuntime
+  -> final response
+```
+
+Run the deterministic Agent + Skill + in-process MCP demonstration:
+
+```bash
+after-sales-skills-demo
+```
+
+The demo uses `ScriptedProvider`, loads `delayed-order-resolution` through `load_skill`, discovers business tools from the MCP server, and uses a temporary SQLite database. It requires no API key or external network.
 
 ## Optional real model
 
