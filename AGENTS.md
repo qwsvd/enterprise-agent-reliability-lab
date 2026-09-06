@@ -8,7 +8,8 @@
   OpenTelemetry instrumentation and local test setup in `app/tracing/`. Phase 7 adds
   deterministic end-to-end evals in `app/evals/`. Phase 8 adds the provider-neutral
   external benchmark boundary and τ³ adapter in `app/benchmarks/`. Phase 9 adds a
-  multi-stage, non-root FastAPI image and GitHub Actions validation.
+  multi-stage, non-root FastAPI image and GitHub Actions validation. Phase 10 adds
+  the final reviewer-oriented documentation and deterministic integrated demo.
 - Keep routes in `app/api.py`, contracts in `app/schemas.py`, persistence in `app/models.py`, and business rules in `app/services.py`.
 - Add pytest coverage for every behavior change and use `Decimal` for money.
 - Preserve refund idempotency. Never add secrets, local databases, caches, or fabricated results.
@@ -47,6 +48,11 @@
   numeric non-root user, and persist its default SQLite database under `/data`.
 - Keep CI least-privileged, pin third-party actions to immutable commit SHAs, install
   from `pyproject.toml`, and run deterministic tests without credentials or services.
-- Do not add RAG, multi-agent systems, a frontend, deployment, or later-phase
-  infrastructure yet.
+- Keep `after-sales-demo` offline and deterministic. It must exercise the existing
+  EvalRunner path rather than duplicate Agent, MCP, Skill, reliability, tracing, or
+  service behavior.
+- Keep README commands synchronized with real project scripts and test them before
+  documenting results.
+- Do not add RAG, multi-agent systems, a frontend, cloud deployment, or unrelated
+  infrastructure.
 - Preserve third-party licenses and attribution when reusing external code.

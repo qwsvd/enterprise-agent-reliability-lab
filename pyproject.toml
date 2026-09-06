@@ -25,6 +25,7 @@ dependencies = [
 dev = ["pytest>=8.3,<9.0"]
 
 [project.scripts]
+after-sales-demo = "app.demo:main"
 after-sales-agent = "app.agent.cli:main"
 after-sales-mcp-server = "app.mcp_integration.server:main"
 after-sales-mcp-demo = "app.mcp_integration.demo:main"

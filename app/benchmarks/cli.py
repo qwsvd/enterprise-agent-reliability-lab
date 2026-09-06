@@ -22,13 +22,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
-    inspect_parser = commands.add_parser("inspect", help="Inspect τ³ adapter/provider availability")
+    inspect_parser = commands.add_parser(
+        "inspect", help="Inspect tau3-bench adapter/provider availability"
+    )
     _format_argument(inspect_parser)
 
     for name, help_text in (
-        ("validate-task", "Validate and normalize a τ³ task contract"),
-        ("validate-results", "Validate a τ³ Results contract or raw Results file"),
-        ("summarize", "Import and summarize external τ³ Results"),
+        ("validate-task", "Validate and normalize a tau3-bench task contract"),
+        (
+            "validate-results",
+            "Validate a tau3-bench Results contract or raw Results file",
+        ),
+        ("summarize", "Import and summarize external tau3-bench Results"),
     ):
         sub = commands.add_parser(name, help=help_text)
         sub.add_argument("path")

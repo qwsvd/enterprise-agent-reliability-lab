@@ -11,8 +11,9 @@ Completed:
 7. Phase 7: deterministic automated Agent evaluation and regression gates
 8. Phase 8: provider-neutral external benchmark boundary and τ³-bench adapter
 9. Phase 9: production FastAPI container and GitHub Actions CI
+10. Phase 10: final documentation and deterministic integrated demo
 
-Later phases, intentionally out of scope:
-
-10. Final documentation and demo
+All planned phases are complete. RAG, multi-agent systems, a frontend, cloud
+deployment, and other unrelated product infrastructure remain intentionally out
+of scope.
 
