@@ -29,7 +29,12 @@
   PII, credentials, endpoints, authorization data, or exception messages.
 - Keep OpenTelemetry tracer injection optional and vendor-neutral. Tests must use the
   isolated in-memory exporter and must not require a collector or network.
-- Do not add automated evals, benchmark integration, RAG, multi-agent systems, a frontend,
+- Keep eval cases in the versioned `evals/cases.yaml` dataset. Grade observable Agent,
+  tool, persistence, reliability, Skill, MCP, and trace outcomes; never copy service-layer
+  policy thresholds into eval execution logic.
+- Evals must use provider injection, temporary SQLite databases, in-process MCP, and the
+  in-memory tracing exporter. Regression thresholds must remain deterministic and make
+  the CLI fail with a nonzero exit status when behavior degrades.
+- Do not add benchmark integration, RAG, multi-agent systems, a frontend,
   Docker, or later-phase infrastructure yet.
 - Preserve third-party licenses and attribution when reusing external code.
-

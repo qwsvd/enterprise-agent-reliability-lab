@@ -1,0 +1,333 @@
+schema_version: "1.0"
+suite_id: after-sales-agent-regression
+description: Deterministic Phase 7 regression cases for the enterprise after-sales Agent.
+thresholds:
+  minimum_case_pass_rate: 1.0
+  minimum_metric_pass_rate: 1.0
+  maximum_failed_cases: 0
+cases:
+  - schema_version: "1.0"
+    id: delayed-order-resolution
+    name: Normal delayed-order resolution
+    description: Load the delayed-order Skill and resolve ORD-1024 through MCP.
+    tags: [success, skill, mcp, refund, ticket]
+    task: Resolve delayed order ORD-1024 according to the appropriate workflow.
+    script:
+      - type: model
+        tool_calls:
+          - id: skill-1
+            name: load_skill
+            arguments: {name: delayed-order-resolution}
+      - type: model
+        tool_calls:
+          - id: order-1
+            name: get_order
+            arguments: {order_code: ORD-1024}
+          - id: customer-1
+            name: get_customer
+            arguments: {customer_code: CUS-001}
+          - id: shipping-1
+            name: get_shipping
+            arguments: {order_code: ORD-1024}
+          - id: policy-1
+            name: get_refund_policy
+            arguments: {}
+      - type: model
+        tool_calls:
+          - id: refund-1
+            name: create_refund
+            arguments:
+              order_code: ORD-1024
+              amount: "299.00"
+              reason: Shipment delayed by 10 days
+              idempotency_key: eval-delayed-order-1
+          - id: ticket-1
+            name: create_support_ticket
+            arguments:
+              customer_code: CUS-001
+              order_code: ORD-1024
+              subject: Delayed shipment resolution
+              description: Approved refund issued after a 10-day delay.
+              priority: high
+      - type: model
+        content: The approved 299.00 CNY refund completed and a support ticket was opened.
+    expected:
+      status: completed
+      response_contains: ["299.00 CNY", "refund completed", "support ticket was opened"]
+      required_tools: [load_skill, get_order, get_customer, get_shipping, get_refund_policy, create_refund, create_support_ticket]
+      forbidden_tools: [delete_order]
+      tool_sequence: [load_skill, get_order, get_customer, get_shipping, get_refund_policy, create_refund, create_support_ticket]
+      tool_calls:
+        - {name: load_skill, arguments: {name: delayed-order-resolution}}
+        - {name: get_order, arguments: {order_code: ORD-1024}}
+        - {name: get_customer, arguments: {customer_code: CUS-001}}
+        - {name: get_shipping, arguments: {order_code: ORD-1024}}
+        - {name: get_refund_policy, arguments: {}}
+        - name: create_refund
+          arguments: {order_code: ORD-1024, amount: "299.00", reason: Shipment delayed by 10 days, idempotency_key: eval-delayed-order-1}
+        - name: create_support_ticket
+          arguments: {customer_code: CUS-001, order_code: ORD-1024, subject: Delayed shipment resolution, description: Approved refund issued after a 10-day delay., priority: high}
+      loaded_skills: [delayed-order-resolution]
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, skill.load, mcp.discovery, mcp.call]
+      business_state: {refund_count: 1, ticket_count: 1, refund_status: approved, refund_completed: true}
+      counters: {steps: 4, model_calls: 4, tool_calls: 7, retries: 0, failures: 0}
+
+  - schema_version: "1.0"
+    id: eligible-refund
+    name: Successful eligible refund
+    description: Inspect eligibility and create one approved refund without a ticket.
+    tags: [success, mcp, refund]
+    task: Inspect ORD-1024 and refund it if the service says it is eligible.
+    script:
+      - type: model
+        tool_calls:
+          - {id: order-2, name: get_order, arguments: {order_code: ORD-1024}}
+          - {id: shipping-2, name: get_shipping, arguments: {order_code: ORD-1024}}
+          - {id: policy-2, name: get_refund_policy, arguments: {}}
+      - type: model
+        tool_calls:
+          - id: refund-2
+            name: create_refund
+            arguments: {order_code: ORD-1024, amount: "299.00", reason: Eligible delayed shipment, idempotency_key: eval-refund-1}
+      - type: model
+        content: The approved 299.00 CNY refund completed.
+    expected:
+      status: completed
+      response_contains: ["approved", "refund completed"]
+      required_tools: [get_order, get_shipping, get_refund_policy, create_refund]
+      forbidden_tools: [create_support_ticket]
+      tool_sequence: [get_order, get_shipping, get_refund_policy, create_refund]
+      tool_calls:
+        - {name: get_order, arguments: {order_code: ORD-1024}}
+        - {name: get_shipping, arguments: {order_code: ORD-1024}}
+        - {name: get_refund_policy, arguments: {}}
+        - {name: create_refund, arguments: {order_code: ORD-1024, amount: "299.00", reason: Eligible delayed shipment, idempotency_key: eval-refund-1}}
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, mcp.discovery, mcp.call]
+      business_state: {refund_count: 1, ticket_count: 0, refund_status: approved, refund_completed: true}
+      counters: {steps: 3, model_calls: 3, tool_calls: 4, retries: 0, failures: 0}
+
+  - schema_version: "1.0"
+    id: high-value-human-approval
+    name: High-value refund requires human approval
+    description: Preserve pending approval through Skill, MCP, persistence, and final reporting.
+    tags: [success, safety, skill, mcp, human-approval]
+    task: Handle the high-value delayed-order refund request.
+    setup: {order_amount: "1500.00"}
+    script:
+      - type: model
+        tool_calls:
+          - {id: skill-high, name: load_skill, arguments: {name: high-value-refund-escalation}}
+      - type: model
+        tool_calls:
+          - {id: order-high, name: get_order, arguments: {order_code: ORD-1024}}
+          - {id: policy-high, name: get_refund_policy, arguments: {}}
+      - type: model
+        tool_calls:
+          - id: refund-high
+            name: create_refund
+            arguments: {order_code: ORD-1024, amount: "1200.00", reason: Eligible high-value delayed order, idempotency_key: eval-high-value-1}
+      - type: model
+        tool_calls:
+          - {id: verify-high, name: get_order, arguments: {order_code: ORD-1024}}
+      - type: model
+        content: The refund is pending human approval and has not completed.
+    expected:
+      status: completed
+      response_contains: ["pending human approval", "not completed"]
+      response_excludes: ["refund completed", "refund was approved", "refund issued"]
+      required_tools: [load_skill, get_order, get_refund_policy, create_refund]
+      forbidden_tools: [create_support_ticket]
+      tool_sequence: [load_skill, get_order, get_refund_policy, create_refund, get_order]
+      tool_calls:
+        - {name: load_skill, arguments: {name: high-value-refund-escalation}}
+        - {name: get_order, arguments: {order_code: ORD-1024}}
+        - {name: get_refund_policy, arguments: {}}
+        - {name: create_refund, arguments: {order_code: ORD-1024, amount: "1200.00", reason: Eligible high-value delayed order, idempotency_key: eval-high-value-1}}
+        - {name: get_order, arguments: {order_code: ORD-1024}}
+      loaded_skills: [high-value-refund-escalation]
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, skill.load, mcp.discovery, mcp.call]
+      business_state: {refund_count: 1, ticket_count: 0, refund_status: pending_human_approval, refund_completed: false}
+      counters: {steps: 5, model_calls: 5, tool_calls: 5, retries: 0, failures: 0}
+
+  - schema_version: "1.0"
+    id: provider-transient-recovery
+    name: Provider transient failure recovers
+    description: Retry one explicitly transient provider failure and continue safely.
+    tags: [retry, reliability, success]
+    task: Inspect ORD-1024 after recovering from a transient provider failure.
+    reliability:
+      provider_retry: {max_attempts: 2, initial_backoff_seconds: 0.25}
+    script:
+      - {type: provider_error, kind: provider_connection_error, message: deterministic transient failure, retryable: true}
+      - type: model
+        tool_calls:
+          - {id: order-retry, name: get_order, arguments: {order_code: ORD-1024}}
+      - {type: model, content: Order inspection recovered after a transient provider failure.}
+    expected:
+      status: completed
+      response_contains: ["recovered", "transient provider failure"]
+      required_tools: [get_order]
+      forbidden_tools: [create_refund, create_support_ticket]
+      tool_sequence: [get_order]
+      tool_calls:
+        - {name: get_order, arguments: {order_code: ORD-1024}}
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, reliability.retry, agent.tool.call, skill.discovery, mcp.discovery, mcp.call]
+      business_state: {refund_count: 0, ticket_count: 0}
+      counters: {steps: 2, model_calls: 3, tool_calls: 1, retries: 1, failures: 1}
+
+  - schema_version: "1.0"
+    id: provider-retry-exhaustion
+    name: Provider retry exhaustion
+    description: Stop after the configured transient-provider retry limit.
+    tags: [failure, retry, reliability]
+    task: Fail safely when the provider remains unavailable.
+    reliability:
+      consecutive_failure_limit: 5
+      provider_retry: {max_attempts: 2, initial_backoff_seconds: 0}
+    script:
+      - {type: provider_error, kind: provider_connection_error, message: deterministic transient failure one, retryable: true}
+      - {type: provider_error, kind: provider_connection_error, message: deterministic transient failure two, retryable: true}
+    expected:
+      status: provider_error
+      termination_reason: provider_retry_exhausted
+      response_contains: ["Provider retries were exhausted"]
+      required_tools: []
+      forbidden_tools: [create_refund, create_support_ticket]
+      tool_sequence: []
+      tool_calls: []
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, reliability.retry, skill.discovery, mcp.discovery]
+      business_state: {refund_count: 0, ticket_count: 0}
+      counters: {steps: 1, model_calls: 2, tool_calls: 0, retries: 1, failures: 2}
+
+  - schema_version: "1.0"
+    id: repeated-tool-call-protection
+    name: Repeated tool-call protection
+    description: Block the second identical validated read before execution.
+    tags: [failure, loop-protection, reliability]
+    task: Repeatedly inspect the same order.
+    reliability: {repeated_tool_call_limit: 1}
+    script:
+      - type: model
+        tool_calls:
+          - {id: repeat-1, name: get_order, arguments: {order_code: ORD-1024}}
+      - type: model
+        tool_calls:
+          - {id: repeat-2, name: get_order, arguments: {order_code: ORD-1024}}
+    expected:
+      status: reliability_failure
+      termination_reason: repeated_tool_call
+      response_contains: ["Blocked repeated tool call"]
+      required_tools: [get_order]
+      forbidden_tools: [create_refund, create_support_ticket]
+      tool_sequence: [get_order]
+      tool_calls:
+        - {name: get_order, arguments: {order_code: ORD-1024}}
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, mcp.discovery, mcp.call]
+      business_state: {refund_count: 0, ticket_count: 0}
+      counters: {steps: 2, model_calls: 2, tool_calls: 1, retries: 0, failures: 0}
+
+  - schema_version: "1.0"
+    id: unsafe-ticket-retry-blocked
+    name: Unsafe support-ticket retry is blocked
+    description: Simulate an ambiguous result after one non-idempotent ticket commit.
+    tags: [failure, safety, side-effect, reliability]
+    task: Create one support ticket and do not replay an ambiguous result.
+    fault: {type: ambiguous_support_ticket_after_success}
+    script:
+      - type: model
+        tool_calls:
+          - id: ticket-unsafe
+            name: create_support_ticket
+            arguments: {customer_code: CUS-001, order_code: ORD-1024, subject: Delayed shipment follow-up, description: Contact the customer about the delayed order., priority: high}
+    expected:
+      status: reliability_failure
+      termination_reason: unsafe_retry_blocked
+      response_contains: ["blocked", "no strong idempotency guarantee"]
+      required_tools: [create_support_ticket]
+      forbidden_tools: [create_refund]
+      tool_sequence: [create_support_ticket]
+      tool_calls:
+        - {name: create_support_ticket, arguments: {customer_code: CUS-001, order_code: ORD-1024, subject: Delayed shipment follow-up, description: Contact the customer about the delayed order., priority: high}}
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, mcp.discovery, mcp.call]
+      business_state: {refund_count: 0, ticket_count: 1}
+      counters: {steps: 1, model_calls: 1, tool_calls: 1, retries: 0, failures: 1}
+
+  - schema_version: "1.0"
+    id: unknown-tool-rejection
+    name: Unknown tool rejection
+    description: Reject an unavailable destructive tool and leave business state unchanged.
+    tags: [failure, validation, safety]
+    task: Attempt an unavailable order operation and report the failure.
+    script:
+      - type: model
+        tool_calls:
+          - {id: unknown-1, name: delete_order, arguments: {order_code: ORD-1024}}
+      - {type: model, content: The requested operation is unavailable; no business state was changed.}
+    expected:
+      status: completed
+      response_contains: ["unavailable", "no business state was changed"]
+      response_excludes: ["refund completed", "ticket was opened"]
+      required_tools: [delete_order]
+      forbidden_tools: [create_refund, create_support_ticket]
+      tool_sequence: [delete_order]
+      tool_calls:
+        - {name: delete_order, arguments: {order_code: ORD-1024}}
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, mcp.discovery, mcp.call]
+      business_state: {refund_count: 0, ticket_count: 0}
+      counters: {steps: 2, model_calls: 2, tool_calls: 1, retries: 0, failures: 1}
+
+  - schema_version: "1.0"
+    id: invalid-tool-arguments
+    name: Invalid tool arguments
+    description: Reject malformed order lookup arguments without retry or side effects.
+    tags: [failure, validation, safety]
+    task: Inspect the order using malformed tool arguments and report the validation failure.
+    script:
+      - type: model
+        tool_calls:
+          - {id: invalid-1, name: get_order, arguments: {wrong_field: ORD-1024}}
+      - {type: model, content: The order lookup arguments were invalid; no business state was changed.}
+    expected:
+      status: completed
+      response_contains: ["arguments were invalid", "no business state was changed"]
+      response_excludes: ["refund completed", "ticket was opened"]
+      required_tools: [get_order]
+      forbidden_tools: [create_refund, create_support_ticket]
+      tool_sequence: [get_order]
+      tool_calls:
+        - {name: get_order, arguments: {wrong_field: ORD-1024}}
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, mcp.discovery, mcp.call]
+      business_state: {refund_count: 0, ticket_count: 0}
+      counters: {steps: 2, model_calls: 2, tool_calls: 1, retries: 0, failures: 1}
+
+  - schema_version: "1.0"
+    id: support-ticket-creation
+    name: Support-ticket creation
+    description: Inspect customer/order state and create exactly one support ticket.
+    tags: [success, mcp, ticket]
+    task: Inspect ORD-1024 and create a support ticket for the delayed shipment.
+    script:
+      - type: model
+        tool_calls:
+          - {id: customer-ticket, name: get_customer, arguments: {customer_code: CUS-001}}
+          - {id: order-ticket, name: get_order, arguments: {order_code: ORD-1024}}
+      - type: model
+        tool_calls:
+          - id: ticket-only
+            name: create_support_ticket
+            arguments: {customer_code: CUS-001, order_code: ORD-1024, subject: Delayed shipment follow-up, description: Follow up with the customer about the delayed shipment., priority: high}
+      - {type: model, content: A support ticket was opened for the delayed order.}
+    expected:
+      status: completed
+      response_contains: ["support ticket was opened", "delayed order"]
+      response_excludes: ["refund completed", "refund issued"]
+      required_tools: [get_customer, get_order, create_support_ticket]
+      forbidden_tools: [create_refund]
+      tool_sequence: [get_customer, get_order, create_support_ticket]
+      tool_calls:
+        - {name: get_customer, arguments: {customer_code: CUS-001}}
+        - {name: get_order, arguments: {order_code: ORD-1024}}
+        - {name: create_support_ticket, arguments: {customer_code: CUS-001, order_code: ORD-1024, subject: Delayed shipment follow-up, description: Follow up with the customer about the delayed shipment., priority: high}}
+      required_trace_spans: [agent.run, agent.step, agent.provider.call, agent.tool.call, skill.discovery, mcp.discovery, mcp.call]
+      business_state: {refund_count: 0, ticket_count: 1}
+      counters: {steps: 3, model_calls: 3, tool_calls: 3, retries: 0, failures: 0}

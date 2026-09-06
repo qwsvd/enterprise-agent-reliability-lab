@@ -1,6 +1,6 @@
 # Enterprise Agent Reliability Lab
 
-This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, repository Agent Skills, provider-neutral reliability controls, and OpenTelemetry tracing. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, OpenTelemetry, and the open `SKILL.md` convention. RAG and later phases remain out of scope.
+This repository contains a typed local after-sales backend, a small LLM tool-calling agent, official-SDK MCP integration, repository Agent Skills, provider-neutral reliability controls, OpenTelemetry tracing, and deterministic automated Agent evaluations. It is built with FastAPI, Pydantic, SQLAlchemy, SQLite, HTTPX, MCP Python SDK v2, OpenTelemetry, and the open `SKILL.md` convention. Benchmark-provider integration, RAG, and later phases remain out of scope.
 
 ## Setup and run
 
@@ -231,6 +231,52 @@ pytest tests/test_tracing.py
 ```
 
 The demo prints only the sanitized in-memory span hierarchy and reliability counters. Exporter/collector deployment is intentionally not configured in this phase.
+
+## Phase 7 automated Agent evaluations
+
+Phase 7 evaluates observable end-to-end behavior rather than calling business services directly. Every case runs through `AgentRuntime`, the Skill metadata/loading boundary, MCP discovery and calls, Phase 5 reliability controls, Phase 6 tracing, the authoritative service layer, and an isolated temporary SQLite database.
+
+The implementation is split into:
+
+- `evals/cases.yaml`: versioned deterministic tasks, scripted provider turns, setup/fault declarations, and expected observable outcomes.
+- `app/evals/models.py`: typed case, result, metric, aggregate, and regression-gate contracts.
+- `app/evals/loader.py`: YAML loading, schema validation, duplicate detection, and case selection.
+- `app/evals/runner.py`: provider-neutral execution, state observation, grading, aggregation, and threshold enforcement.
+- `app/evals/report.py`: concise human-readable reporting; Pydantic results provide machine-readable JSON.
+- `app/evals/cli.py`: full-suite, single-case, and selected-case command-line execution.
+
+The case format is explicitly versioned. Expectations describe public outcomes, persisted state, calls, counters, and traces—not private implementation details:
+
+```yaml
+schema_version: "1.0"
+suite_id: after-sales-agent-regression
+thresholds:
+  minimum_case_pass_rate: 1.0
+  minimum_metric_pass_rate: 1.0
+  maximum_failed_cases: 0
+cases:
+  - schema_version: "1.0"
+    id: eligible-refund
+    task: Inspect ORD-1024 and refund it if the service says it is eligible.
+    script: [...]      # deterministic provider responses or typed provider errors
+    expected: {...}    # tool behavior, state, counters, traces, and final outcome
+```
+
+The dataset covers delayed-order resolution, an eligible refund, high-value human approval, transient-provider recovery, retry exhaustion, repeated-call protection, unsafe support-ticket replay prevention, unknown tools, invalid arguments, and normal ticket creation. Refund thresholds and eligibility rules remain exclusively in `app/services.py`; the evaluator compares observable tool results and persisted state.
+
+Per-case and aggregate metrics cover task/final-outcome correctness, required and forbidden/unnecessary tools, exact sequences and structured arguments, business/refund/approval state, side-effect safety, reliability and termination behavior, unsupported-claim risk, Skill and trace coverage, and step/model/tool/retry/failure counts. The configured regression gate fails when the case pass rate, any metric rate, or maximum failed-case threshold degrades.
+
+Run all cases, one case, or a selected set:
+
+```bash
+after-sales-eval
+after-sales-eval --case high-value-human-approval
+after-sales-eval --case provider-transient-recovery --case provider-retry-exhaustion
+after-sales-eval --format json
+pytest tests/test_evals.py
+```
+
+The text report is intended for engineers; `--format json` emits the complete machine-readable result. A failed regression gate exits nonzero. All built-in cases use `ScriptedProvider`, in-process MCP, injected sleeping, in-memory tracing, and temporary databases, so no API key, external network, collector, or real wait is required.
 
 ## Optional real model
 
