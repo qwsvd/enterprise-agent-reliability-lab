@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
+from app.home import render_homepage
 from app.schemas import (
     CustomerResponse, HealthResponse, OrderResponse, RefundCreate,
     RefundPolicyResponse, RefundResponse, ShipmentResponse, TicketCreate, TicketResponse,
@@ -19,6 +21,11 @@ def get_session() -> Session:
 
 def _error(error: ServiceError) -> HTTPException:
     return HTTPException(status_code=error.status_code, detail=error.detail)
+
+
+@router.get("/", response_class=HTMLResponse, include_in_schema=False)
+def homepage() -> HTMLResponse:
+    return HTMLResponse(render_homepage())
 
 
 @router.get("/health", response_model=HealthResponse)

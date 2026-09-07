@@ -1,6 +1,14 @@
 # Enterprise Agent Reliability Lab
 
-A complete, local reference implementation of an enterprise after-sales AI Agent:
+[![CI](https://github.com/qwsvd/enterprise-agent-reliability-lab/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qwsvd/enterprise-agent-reliability-lab/actions)
+
+**[Live Demo](https://enterprise-agent-reliability-lab.onrender.com/)** ·
+**[API Docs](https://enterprise-agent-reliability-lab.onrender.com/docs)** ·
+**[Health](https://enterprise-agent-reliability-lab.onrender.com/health)** ·
+**[GitHub Actions](https://github.com/qwsvd/enterprise-agent-reliability-lab/actions)** ·
+**[Release v1.0.1](https://github.com/qwsvd/enterprise-agent-reliability-lab/releases/tag/v1.0.1)**
+
+A production-oriented reference implementation of an enterprise after-sales AI Agent:
 typed business APIs, LLM tool calling, MCP discovery, progressively loaded Agent
 Skills, reliability controls, OpenTelemetry traces, deterministic regression evals,
 an external τ³-bench adapter, and production Docker/CI delivery.
@@ -297,7 +305,8 @@ docker run --rm -p 8000:8000 -v after-sales-data:/data enterprise-agent-reliabil
 ```
 
 The multi-stage Python 3.11 slim image runs as numeric user/group `10001:10001`,
-stores SQLite state at `/data/after_sales.db`, and health-checks `GET /health`.
+stores SQLite state at `/data/after_sales.db`, honors `PORT` when supplied (default
+`8000`), and health-checks `GET /health` on the same resolved port.
 `.dockerignore` allowlists the build context so local credentials, databases, Git
 metadata, tests, and generated files are excluded.
 

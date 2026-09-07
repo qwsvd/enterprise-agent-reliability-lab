@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 import yaml
+
+from app.entrypoint import main as run_container
+from app.entrypoint import resolve_port
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +21,34 @@ def test_dockerfile_has_production_runtime_controls() -> None:
     assert "USER 10001:10001" in dockerfile
     assert "DATABASE_URL=sqlite:////data/after_sales.db" in dockerfile
     assert "HEALTHCHECK" in dockerfile
-    assert '["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]' in dockerfile
+    assert "os.getenv('PORT', '8000')" in dockerfile
+    assert '["python", "-m", "app.entrypoint"]' in dockerfile
+
+
+def test_container_entrypoint_defaults_and_honors_valid_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert resolve_port(None) == 8000
+    assert resolve_port("") == 8000
+    assert resolve_port("10000") == 10000
+    with pytest.raises(RuntimeError, match="integer"):
+        resolve_port("not-a-port")
+    with pytest.raises(RuntimeError, match="between"):
+        resolve_port("70000")
+
+    called: dict[str, object] = {}
+
+    def fake_run(application: str, **kwargs: object) -> None:
+        called.update(application=application, **kwargs)
+
+    monkeypatch.setenv("PORT", "10000")
+    monkeypatch.setattr("app.entrypoint.uvicorn.run", fake_run)
+    run_container()
+    assert called == {
+        "application": "app.main:app",
+        "host": "0.0.0.0",
+        "port": 10000,
+    }
 
 
 def test_docker_context_is_allowlisted() -> None:

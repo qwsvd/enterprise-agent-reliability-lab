@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app import __version__
 from app import models  # noqa: F401
 from app.api import get_session, router
 from app.database import Database
@@ -22,7 +23,13 @@ def create_app(database_url: str | None = None) -> FastAPI:
         database.dispose()
 
     application = FastAPI(
-        title="Enterprise After-Sales Service", version="0.1.0", lifespan=lifespan
+        title="Enterprise Agent Reliability Lab API",
+        description=(
+            "Production-oriented reference API for a reliable enterprise after-sales "
+            "Agent, including typed business state, refund policy, and support workflows."
+        ),
+        version=__version__,
+        lifespan=lifespan,
     )
     application.dependency_overrides[get_session] = database.sessions
     application.include_router(router)

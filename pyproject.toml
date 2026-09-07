@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "enterprise-agent-reliability-lab"
-version = "0.4.0"
-description = "Local after-sales business backend for enterprise agent reliability experiments"
+version = "1.0.1"
+description = "Production-oriented reference implementation for reliable enterprise AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
