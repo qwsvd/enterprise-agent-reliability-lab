@@ -4,14 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "enterprise-agent-reliability-lab"
-version = "1.0.1"
-description = "Production-oriented reference implementation for reliable enterprise AI agents"
+version = "1.1.0"
+description = "Production-oriented single- and multi-agent reliability reference implementation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = [
   "fastapi>=0.115,<1.0",
   "httpx>=0.27,<1.0",
+  "langgraph>=1.2,<2.0",
   "mcp>=2.1,<3.0",
   "opentelemetry-api>=1.44,<2.0",
   "opentelemetry-sdk>=1.44,<2.0",
@@ -33,6 +34,8 @@ after-sales-skills-demo = "app.skills.demo:main"
 after-sales-tracing-demo = "app.tracing.demo:main"
 after-sales-eval = "app.evals.cli:main"
 after-sales-benchmark = "app.benchmarks.cli:main"
+after-sales-multi-agent-demo = "app.orchestration.demo:main"
+after-sales-multi-agent-eval = "app.orchestration.eval_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

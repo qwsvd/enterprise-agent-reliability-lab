@@ -9,6 +9,7 @@ from typing import Any, Literal
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
+from app import __version__
 from app import models  # noqa: F401 - registers SQLAlchemy metadata
 from app.agent.tools import ToolRegistry
 from app.database import Database
@@ -28,7 +29,7 @@ def create_mcp_server(database_url: str | None = None) -> MCPServer[Database]:
 
     server: MCPServer[Database] = MCPServer(
         name="enterprise-after-sales",
-        version="0.3.0",
+        version=__version__,
         instructions="Use these tools to inspect and operate the after-sales business system.",
         lifespan=lifespan,
     )

@@ -55,7 +55,7 @@ jobs:
         run: python -m pytest
 
       - name: Validate application and package imports
-        run: python -c "from app.main import app, create_app; from app.agent.runtime import AgentRuntime; from app.benchmarks import Tau3BenchmarkAdapter; assert app.title; assert create_app(); assert AgentRuntime; assert Tau3BenchmarkAdapter"
+        run: python -c "from app.main import app, create_app; from app.agent.runtime import AgentRuntime; from app.benchmarks import Tau3BenchmarkAdapter; from app.orchestration import MultiAgentOrchestrator; assert app.title; assert create_app(); assert AgentRuntime; assert MultiAgentOrchestrator; assert Tau3BenchmarkAdapter"
 
       - name: Build wheel
         run: python -m pip wheel --no-deps --wheel-dir dist .

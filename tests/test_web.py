@@ -25,6 +25,11 @@ def test_public_homepage_is_recruiter_facing_and_self_contained(
     assert "OpenTelemetry tracing" in response.text
     assert "Regression gates" in response.text
     assert "GitHub Actions" in response.text
+    assert "LangGraph orchestration" in response.text
+    assert "dependency-aware Scheduler" in response.text
+    assert "Working + episodic memory" in response.text
+    assert "bounded replanning" in response.text
+    assert "after-sales-multi-agent-demo --format json" in response.text
     assert "@media (max-width: 560px)" in response.text
     assert "<script" not in response.text.casefold()
 
@@ -71,7 +76,7 @@ def test_package_and_application_versions_are_synchronized() -> None:
     with (ROOT / "pyproject.toml").open("rb") as stream:
         project = tomllib.load(stream)["project"]
 
-    assert project["version"] == __version__ == "1.0.1"
+    assert project["version"] == __version__ == "1.1.0"
 
 
 def test_readme_public_links_and_release_are_visible_at_the_top() -> None:

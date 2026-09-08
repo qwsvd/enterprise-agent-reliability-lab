@@ -6,12 +6,14 @@
 **[API Docs](https://enterprise-agent-reliability-lab.onrender.com/docs)** ·
 **[Health](https://enterprise-agent-reliability-lab.onrender.com/health)** ·
 **[GitHub Actions](https://github.com/qwsvd/enterprise-agent-reliability-lab/actions)** ·
-**[Release v1.0.1](https://github.com/qwsvd/enterprise-agent-reliability-lab/releases/tag/v1.0.1)**
+**Source version 1.1.0** ·
+**[Published Release v1.0.1](https://github.com/qwsvd/enterprise-agent-reliability-lab/releases/tag/v1.0.1)**
 
 A production-oriented reference implementation of an enterprise after-sales AI Agent:
 typed business APIs, LLM tool calling, MCP discovery, progressively loaded Agent
-Skills, reliability controls, OpenTelemetry traces, deterministic regression evals,
-an external τ³-bench adapter, and production Docker/CI delivery.
+Skills, official-LangGraph multi-agent orchestration, working and episodic memory,
+reflection and bounded replanning, reliability controls, OpenTelemetry traces,
+deterministic regression evals, an external τ³-bench adapter, and Docker/CI delivery.
 
 > **Scenario:** Customer `CUS-001` reports that order `ORD-1024`—a `299.00 CNY`
 > shipment delayed by 10 days—has not arrived. The Agent inspects customer, order,
@@ -24,13 +26,14 @@ MCP server, telemetry collector, or benchmark installation required:
 ```bash
 python -m pip install -e ".[dev]"
 after-sales-demo
+after-sales-multi-agent-demo
 python -m pytest
 ```
 
 ```text
-User task -> AgentRuntime -> reliability controls -> selected SKILL.md
-          -> MCP-discovered tools -> service layer -> SQLite
-          -> structured results -> OpenTelemetry trace -> eval regression gate
+User task -> Single-Agent AgentRuntime OR LangGraph multi-agent orchestration
+          -> reliability controls -> selected SKILL.md -> MCP-discovered tools
+          -> service layer -> SQLite -> trace -> deterministic eval gate
 ```
 
 ## Why this project exists
@@ -43,6 +46,11 @@ regressions. This repository demonstrates those boundaries with small typed modu
   refund policy authoritative outside the model.
 - **AgentRuntime + provider abstraction** implement a bounded multi-step tool loop
   that works with a deterministic provider or an optional OpenAI-compatible endpoint.
+- **LangGraph orchestration** adds separate Planner, dependency Scheduler, Executor,
+  and Reviewer roles with typed state, reflection, and bounded replanning while
+  preserving the Single-Agent implementation for comparison.
+- **Working and episodic memory** retain current-run evidence and persist sanitized
+  episode summaries in SQLite for bounded, deterministic retrieval before planning.
 - **Agent Skills** supply versioned workflow guidance through progressive disclosure;
   they do not mutate state or replace policy.
 - **MCP** supplies protocol-level capability discovery and invocation without
@@ -65,10 +73,22 @@ while dashed lines are cross-cutting verification boundaries.
 
 ```mermaid
 flowchart LR
-    U[User task] --> AR[AgentRuntime]
+    U[User task] --> MODE{Execution path}
+    MODE --> AR[Single-Agent\nAgentRuntime]
     AR <--> P[LLMProvider\nScripted or OpenAI-compatible]
     AR --> RC[ReliabilityController]
+    MODE --> LG[LangGraph StateGraph]
+    LG --> MEM[Retrieve episodic memory]
+    MEM --> PA[Planner Agent\nvalidated TaskPlan]
+    PA --> DS[Dependency Scheduler]
+    DS --> EA[Executor Agent]
+    EA --> RA[Reviewer Agent]
+    RA -->|continue| DS
+    RA -->|reflect| RF[Reflection]
+    RF -->|bounded replan| PA
+    RA -->|complete or fail| MW[Write episode]
     AR --> SAT[SkillAwareTools]
+    EA --> SAT
     SAT --> SR[SkillRegistry\nmetadata then selected SKILL.md]
     SAT --> MA[MCPToolAdapter]
     MA -->|tools/list and tools/call| MS[Official-SDK MCP server]
@@ -77,6 +97,7 @@ flowchart LR
     S --> DB[(SQLite)]
     S --> TR --> MS --> MA --> AR
     OT[OpenTelemetry spans] -. instruments .-> AR
+    OT -. instruments .-> LG
     OT -. instruments .-> MA
     ER[EvalRunner + regression gate] -. executes and grades .-> AR
     BA[τ³-bench adapter] -. imports external contracts/results .-> BR[Benchmark report]
@@ -99,11 +120,13 @@ Key boundaries:
 |---|---|
 | `app/api.py`, `app/services.py`, `app/models.py` | HTTP API, business policy, persistence |
 | `app/agent/` | provider-neutral Agent loop, providers, tools, typed results |
+| `app/orchestration/` | LangGraph multi-agent planning, scheduling, execution, review, memory, demos, evals |
 | `app/mcp_integration/` | official-SDK MCP server, client, discovery adapter |
 | `.agents/skills/`, `app/skills/` | `SKILL.md` workflows and progressive loader |
 | `app/reliability/` | budgets, retries, timeouts, loop and side-effect guards |
 | `app/tracing/` | OpenTelemetry instrumentation and in-memory exporter |
 | `evals/cases.yaml`, `app/evals/` | versioned cases, grading, metrics, regression gate |
+| `evals/orchestration_cases.yaml` | versioned multi-agent success, approval, recovery, and budget cases |
 | `app/benchmarks/` | provider-neutral benchmark contracts and τ³ adapter |
 | `app/demo.py` | deterministic integrated reviewer demo |
 | `Dockerfile`, `.github/workflows/ci.yml` | production API image and CI validation |
@@ -121,6 +144,49 @@ Key boundaries:
 | 7 | Versioned deterministic Agent eval suite and regression gate | Outcome, tool, state, safety, reliability, trace, and claim grading |
 | 8 | Provider-neutral external benchmark layer and τ³-bench adapter | Honest task/result interoperability across runtime constraints |
 | 9 | Multi-stage non-root Docker image and GitHub Actions CI | Repeatable packaging and continuous Python/test/container validation |
+| 10 | Reviewer-oriented documentation and integrated deterministic demo | Verifiable portfolio surface without fabricated results |
+| 11 | Official LangGraph multi-agent runtime, memory, reflection, replanning, and eval comparison | Planning, dependency scheduling, specialized roles, recovery, persistent context, and measurable architecture trade-offs |
+
+## Single-Agent and Multi-Agent architectures
+
+The two runtimes are intentionally retained side by side:
+
+- **Single-Agent:** `app/agent/runtime.py` owns one bounded provider/tool loop. It is
+  the compact reference path and the baseline used by existing evals.
+- **Multi-Agent:** `app/orchestration/graph.py` compiles a real LangGraph
+  `StateGraph`. Named nodes retrieve memory, plan, schedule dependency-ready work,
+  execute one task, review evidence, reflect, replan when bounded policy permits,
+  and persist the final episode.
+
+Concrete responsibilities remain narrow:
+
+- **Planning:** `ProviderPlanner` reuses `LLMProvider` and validates JSON against
+  `TaskPlan`; `ScriptedPlanner` and `DeterministicPlanner` provide offline paths.
+- **Scheduling:** `DependencyScheduler` validates references, detects cycles, marks
+  dependency-blocked work, and selects ready tasks by priority and graph state.
+- **Tool use:** `ExecutorAgent` resolves values from prior evidence and invokes the
+  existing `SkillAwareTools`/`MCPToolAdapter` boundary. It never calls SQLAlchemy
+  business models directly.
+- **Reflection:** `EvidenceReviewer` rejects missing evidence and unsupported
+  completion claims. Structured reflections feed a bounded planner re-entry.
+- **Memory:** `WorkingMemory` holds the active plan, evidence, executions, reviews,
+  and reflections. `EpisodicMemoryStore` persists sanitized episode summaries and
+  retrieves relevant history with explicit lexical overlap—not embeddings.
+
+### Multi-Agent reliability and observability
+
+`OrchestrationConfig` adds maximum graph steps, replans, reflections, task attempts,
+repeated tasks, and repeated effective plans while reusing the existing model/tool
+budgets, timeout values, side-effect classifications, and idempotency policy.
+Non-idempotent ticket calls are never replayed after an ambiguous outcome. Every
+terminal path has a typed `OrchestrationTermination` value.
+
+The root `multi_agent.run` span contains payload-safe children:
+`memory.retrieve`, `planner.plan`, `scheduler.select`, `executor.task`,
+`reviewer.review`, optional `reflection` and `planner.replan`, and `memory.write`.
+MCP, Skill, and retry spans remain nested through existing tracer injection. Traces
+contain roles, counts, statuses, attempts, and termination categories—not goals,
+business identifiers, prompts, arguments, results, PII, or credentials.
 
 ## Deterministic end-to-end demo
 
@@ -144,6 +210,22 @@ after-sales-demo --format json
 The demo uses `ScriptedProvider`, temporary SQLite databases, in-process official-SDK
 MCP, injected retry sleeping, and an in-memory OpenTelemetry exporter. Temporary state
 is removed when each scenario finishes.
+
+### LangGraph multi-agent demo and comparison
+
+```bash
+after-sales-multi-agent-demo
+after-sales-multi-agent-demo --format json
+```
+
+The command performs a real offline warm-up episode and then a second run whose
+Planner receives the retrieved episode. The printed plan, dependency-driven execution
+order, MCP tool sequence, reviews, reflections, persisted business outcome,
+termination reason, counters, measured wall-clock latency, and trace spans all come
+from execution. It also runs the existing Single-Agent eval case and prints a
+side-by-side comparison of success, steps, tool/model calls, replans, reflections,
+retries, and reliability outcome. The deterministic planner has no token-usage
+metadata, so token counts and monetary cost remain explicitly unavailable.
 
 ## Setup
 
@@ -210,6 +292,23 @@ Before the optional command, configure `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL
 and optionally `LLM_TIMEOUT_SECONDS` in the shell from `.env.example`. The repository
 does not claim a real-model result unless that command is actually run.
 
+### Multi-Agent orchestration
+
+Run the deterministic LangGraph orchestration and its versioned regression suite:
+
+```bash
+after-sales-multi-agent-demo
+after-sales-multi-agent-demo --format json
+after-sales-multi-agent-eval
+after-sales-multi-agent-eval --case multi-agent-high-value
+after-sales-multi-agent-eval --format json
+```
+
+The default path is offline. `ProviderPlanner` is the optional real
+OpenAI-compatible planning path: it stays behind the existing `LLMProvider`, sends
+available tool schemas and bounded memory/reflection context, and accepts only a
+strictly validated `TaskPlan` JSON response.
+
 ### MCP
 
 Run the deterministic Agent over a real local stdio MCP transport:
@@ -241,6 +340,7 @@ complete `SKILL.md` is loaded through `load_skill`; unrelated bodies stay unload
 ```bash
 after-sales-tracing-demo
 python -m pytest tests/test_tracing.py
+python -m pytest tests/test_orchestration.py -k trace
 ```
 
 The demo prints sanitized in-memory span names, parents, attributes, and Agent
@@ -250,6 +350,7 @@ counters. It sends nothing to an external collector.
 
 ```bash
 python -m pytest tests/test_reliability.py
+python -m pytest tests/test_orchestration.py
 ```
 
 These tests cover success, model/tool/step budgets, transient recovery, retry
@@ -267,6 +368,13 @@ after-sales-eval --format json
 
 The versioned suite in `evals/cases.yaml` supports full or selected execution.
 Regression-gate failure returns a nonzero exit status.
+
+Multi-Agent eval cases live separately in `evals/orchestration_cases.yaml` so the
+Single-Agent baseline remains directly comparable. They grade task completion, plan
+validity, dependency correctness, tool selection/execution, final business state,
+unsupported claims, human approval, reflection recovery, replans, steps, calls,
+termination, and measured latency. Exact latency is reported but is not used as a
+fabricated performance target.
 
 ### External benchmark adapter
 
@@ -290,6 +398,7 @@ tests; they are not official tasks or scores.
 python -m pytest
 python -m pip check
 python -m compileall -q app
+after-sales-multi-agent-eval
 ```
 
 Tests are isolated and offline: no LLM key, paid request, network, MCP server,
@@ -347,15 +456,34 @@ copied into the production API image.
   benchmark results. The project never treats process success as a benchmark score.
 - No real LLM, interoperability, benchmark, performance, or production metric is
   claimed unless it was actually executed.
+- Episodic memory stores bounded task objectives and sanitized evidence summaries;
+  customer names, email addresses, tracking codes, and Skill bodies are excluded.
+- Planner model calls are optional. Offline demos report model calls as zero and do
+  not infer token usage or cost when the provider does not supply usage metadata.
 
 ## Scope and attribution
 
-This is a focused single-Agent reliability laboratory. RAG, multi-agent orchestration,
-frontend, cloud deployment, Kubernetes, OAuth, and unrelated infrastructure are
-deliberately out of scope.
+This is a focused Agent engineering laboratory with both a Single-Agent baseline and
+a LangGraph multi-agent orchestration path. RAG, vector memory, frontend,
+Kubernetes, OAuth, and unrelated infrastructure remain deliberately out of scope.
 
 Phase 8 targets Sierra Research's maintained
 [τ³-bench / `tau2` repository](https://github.com/sierra-research/tau2-bench) through
 a data-contract and external-process boundary. No upstream source or dataset is
 vendored. See `THIRD_PARTY_NOTICES.md` for license attribution and fixture provenance.
 The repository's own license is in `LICENSE`.
+
+LangGraph is consumed as an official PyPI dependency under its MIT License; no
+upstream source is vendored. See `THIRD_PARTY_NOTICES.md`.
+
+## Known limitations
+
+- The deterministic Planner and Reviewer make offline regression behavior stable;
+  real-model quality depends on the configured OpenAI-compatible provider and has no
+  claimed score in this repository.
+- Episodic retrieval is explainable token overlap, not semantic/vector retrieval.
+- The scheduler intentionally executes one ready task at a time to preserve SQLite
+  transaction and side-effect clarity; it validates a dependency DAG but does not
+  claim distributed parallel scheduling.
+- Latency is measured from actual local execution. Provider token usage and monetary
+  cost remain `null` unless a future provider contract supplies real usage metadata.

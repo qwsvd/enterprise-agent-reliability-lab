@@ -13,7 +13,15 @@ Completed:
 9. Phase 9: production FastAPI container and GitHub Actions CI
 10. Phase 10: final documentation and deterministic integrated demo
 
-All planned phases are complete. RAG, multi-agent systems, a frontend, cloud
-deployment, and other unrelated product infrastructure remain intentionally out
-of scope.
+All original phases are complete.
+
+Post-1.0 product increment completed:
+
+11. Version 1.1: official LangGraph multi-agent orchestration, typed planning,
+    dependency-aware scheduling, Planner/Executor/Reviewer handoffs, working and
+    persistent episodic memory, reflection, bounded replanning, orchestration
+    reliability/tracing/evals, deterministic demo, and Single-Agent comparison
+
+RAG, a frontend, additional deployment infrastructure, and other unrelated product
+systems remain intentionally out of scope.
 

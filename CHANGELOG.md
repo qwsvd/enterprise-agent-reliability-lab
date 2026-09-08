@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.0] - 2026-09-09
+
+### Added
+
+- Official LangGraph-based Planner, dependency scheduler, Executor, Reviewer,
+  reflection, and bounded-replanning orchestration alongside the existing
+  Single-Agent runtime.
+- Typed working memory and persistent SQLite episodic memory with deterministic,
+  bounded lexical retrieval.
+- Multi-agent reliability budgets, side-effect replay protection, payload-safe
+  OpenTelemetry spans, deterministic evals, regression gates, and Single-Agent
+  comparison.
+- Offline `after-sales-multi-agent-demo` and `after-sales-multi-agent-eval` commands.
+
 ## [1.0.1] - 2026-09-07
 
 ### Added
