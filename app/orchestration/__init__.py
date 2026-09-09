@@ -9,6 +9,7 @@ from app.orchestration.models import (
     PlannedToolCall,
     ReviewDecision,
     ReviewResult,
+    TaskExecutionKind,
     TaskPlan,
     TaskStatus,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "SchedulerError",
     "ScriptedPlanner",
     "ScriptedReviewer",
+    "TaskExecutionKind",
     "TaskPlan",
     "TaskStatus",
 ]

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import sqlite3
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import pytest
 from opentelemetry.sdk.trace import ReadableSpan
+from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from app.agent.providers import ProviderError, ScriptedProvider
@@ -29,7 +31,7 @@ from app.orchestration import (
     TaskPlan,
     TaskStatus,
 )
-from app.orchestration.models import PlannerContext
+from app.orchestration.models import PlannerContext, ToolEvidence, WorkingMemory
 from app.orchestration.reviewer import EvidenceReviewer
 from app.orchestration.scenarios import DELAYED_ORDER_GOAL, build_delayed_order_plan
 from app.reliability import ReliabilityConfig, RetryPolicy
@@ -427,8 +429,24 @@ def test_dependency_scheduler_rejects_invalid_and_cyclic_plans() -> None:
         plan_id="cycle",
         goal="Detect dependency cycle",
         tasks=[
-            PlanTask(task_id="a", objective="Execute task A.", dependencies=["b"]),
-            PlanTask(task_id="b", objective="Execute task B.", dependencies=["a"]),
+            PlanTask(
+                task_id="a",
+                objective="Execute task A.",
+                dependencies=["b"],
+                required_tools=["get_order"],
+                tool_call=PlannedToolCall(
+                    name="get_order", arguments={"order_code": "ORD-1024"}
+                ),
+            ),
+            PlanTask(
+                task_id="b",
+                objective="Execute task B.",
+                dependencies=["a"],
+                required_tools=["get_order"],
+                tool_call=PlannedToolCall(
+                    name="get_order", arguments={"order_code": "ORD-1024"}
+                ),
+            ),
         ],
     )
     with pytest.raises(SchedulerError) as cycle:
@@ -505,6 +523,147 @@ def test_episodic_memory_persists_retrieves_and_influences_planner_context(
     assert planner.contexts[0].retrieved_episodes
     assert len(retrieved) == 2
     assert all("email" not in str(item.evidence_summary).casefold() for item in retrieved)
+
+
+def test_episode_persistence_redacts_sensitive_goal_and_objective_data(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "private-episodes.db"
+    memory = EpisodicMemoryStore(f"sqlite:///{database_path.as_posix()}")
+    secrets = [
+        "alice.private@example.com",
+        "+86 138-0013-8000",
+        "CUS-PRIVATE-77",
+        "ORD-SECRET-88",
+        "SF-20260906001024",
+        "api_supersecretvalue123",
+    ]
+    goal = (
+        "Resolve delayed after-sales case for CUS-PRIVATE-77 and ORD-SECRET-88; "
+        "contact alice.private@example.com at +86 138-0013-8000; "
+        "tracking SF-20260906001024; token api_supersecretvalue123."
+    )
+    plan = simple_plan()
+    plan.goal = goal
+    plan.tasks[0].objective = (
+        "Inspect customer code CUS-PRIVATE-77, order code ORD-SECRET-88, "
+        "and tracking number SF-20260906001024 for alice.private@example.com."
+    )
+    working = WorkingMemory(
+        goal=goal,
+        current_plan=plan,
+        tool_evidence=[
+            ToolEvidence(
+                task_id="inspect",
+                tool_name="get_order",
+                ok=True,
+                data={
+                    "code": "ORD-SECRET-88",
+                    "customer_code": "CUS-PRIVATE-77",
+                    "email": "alice.private@example.com",
+                    "status": "shipped",
+                },
+            )
+        ],
+    )
+    try:
+        written = memory.write_episode(
+            run_id="privacy-run",
+            memory=working,
+            outcome="completed",
+            termination_reason="completed",
+        )
+        retrieved = memory.retrieve("Resolve delayed after-sales case", limit=1)
+    finally:
+        memory.close()
+
+    with sqlite3.connect(database_path) as connection:
+        row = connection.execute(
+            "SELECT goal, keywords_json, plan_json, evidence_json "
+            "FROM agent_episodes WHERE run_id = ?",
+            ("privacy-run",),
+        ).fetchone()
+    assert row is not None
+    persisted = " ".join(str(value) for value in row).casefold()
+    returned = (
+        written.model_dump_json() + " " + retrieved[0].model_dump_json()
+    ).casefold()
+    planner = DeterministicPlanner(lambda _: simple_plan())
+    planner.plan(
+        PlannerContext(
+            goal="Resolve another delayed case",
+            available_tools=[],
+            retrieved_episodes=retrieved,
+        )
+    )
+    planner_context = planner.contexts[0].model_dump_json().casefold()
+
+    for secret in secrets:
+        assert secret.casefold() not in persisted
+        assert secret.casefold() not in returned
+        assert secret.casefold() not in planner_context
+    assert "[redacted-email]" in persisted
+    assert "[redacted-phone]" in persisted
+    assert "[redacted-business-id]" in persisted
+    assert "[redacted-sensitive-id]" in persisted
+    assert '"status": "shipped"' in persisted
+
+
+def test_tool_task_contract_rejects_missing_executable_call() -> None:
+    with pytest.raises(ValidationError, match="requires an executable tool call"):
+        PlanTask(task_id="reason", objective="Decide what happened from memory.")
+
+
+def test_provider_planner_rejects_structured_tool_free_task(tmp_path: Path) -> None:
+    tool_free_plan = """{
+      "plan_id": "tool-free-provider-plan",
+      "goal": "Decide what happened from memory",
+      "tasks": [{
+        "task_id": "reason",
+        "objective": "Decide what happened from memory."
+      }]
+    }"""
+    runtime, _, memory, tracing, _ = orchestrator(
+        tmp_path,
+        planner=ProviderPlanner(
+            ScriptedProvider([ModelResponse(content=tool_free_plan)])
+        ),
+        database_name="provider-tool-free.db",
+    )
+    try:
+        result = runtime.run("Decide what happened from memory")
+    finally:
+        tracing.shutdown()
+        memory.close()
+
+    assert result.status == "failed"
+    assert result.termination_reason == OrchestrationTermination.INVALID_PLAN
+    assert result.counters.model_calls == 1
+    assert result.counters.tool_calls == 0
+    assert result.evidence == []
+
+
+def test_executor_defense_rejects_mutated_tool_free_plan_without_success_evidence(
+    tmp_path: Path,
+) -> None:
+    plan = simple_plan()
+    plan.tasks[0].tool_call = None
+    plan.tasks[0].required_tools = []
+    runtime, _, memory, tracing, _ = orchestrator(
+        tmp_path,
+        plans=[plan],
+        database_name="tool-free.db",
+    )
+    try:
+        result = runtime.run("Inspect the order safely")
+    finally:
+        tracing.shutdown()
+        memory.close()
+
+    assert result.status == "failed"
+    assert result.termination_reason == OrchestrationTermination.INVALID_PLAN
+    assert result.counters.tool_calls == 0
+    assert result.evidence == []
 
 
 def test_provider_planner_retries_transient_error_then_validates_structured_plan(

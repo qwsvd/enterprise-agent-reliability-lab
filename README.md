@@ -456,8 +456,11 @@ copied into the production API image.
   benchmark results. The project never treats process success as a benchmark score.
 - No real LLM, interoperability, benchmark, performance, or production metric is
   claimed unless it was actually executed.
-- Episodic memory stores bounded task objectives and sanitized evidence summaries;
-  customer names, email addresses, tracking codes, and Skill bodies are excluded.
+- Episodic memory applies one pre-persistence redaction boundary to goals and task
+  objectives, derives retrieval terms only from the redacted goal, and keeps the
+  existing evidence whitelist. Email addresses, phone numbers, customer/order/
+  tracking identifiers, credential-like identifiers, and Skill bodies are excluded
+  from persisted and retrieved episodes.
 - Planner model calls are optional. Offline demos report model calls as zero and do
   not infer token usage or cost when the provider does not supply usage metadata.
 

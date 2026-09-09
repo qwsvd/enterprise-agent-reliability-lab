@@ -22,6 +22,10 @@ class TaskStatus(StrEnum):
     BLOCKED = "blocked"
 
 
+class TaskExecutionKind(StrEnum):
+    TOOL = "tool"
+
+
 class ReviewDecision(StrEnum):
     COMPLETE = "complete"
     CONTINUE = "continue"
@@ -60,6 +64,7 @@ class PlannedToolCall(OrchestrationModel):
 class PlanTask(OrchestrationModel):
     task_id: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
     objective: str = Field(min_length=3, max_length=500)
+    execution_kind: TaskExecutionKind = TaskExecutionKind.TOOL
     dependencies: list[str] = Field(default_factory=list)
     required_tools: list[str] = Field(default_factory=list)
     tool_call: PlannedToolCall | None = None
@@ -75,8 +80,8 @@ class PlanTask(OrchestrationModel):
             raise ValueError("Task dependencies must be unique")
         if len(set(self.required_tools)) != len(self.required_tools):
             raise ValueError("Required tools must be unique")
-        if self.tool_call is None and self.required_tools:
-            raise ValueError("A task with required tools needs a tool call")
+        if self.execution_kind == TaskExecutionKind.TOOL and self.tool_call is None:
+            raise ValueError("A tool task requires an executable tool call")
         if self.tool_call is not None and self.required_tools != [self.tool_call.name]:
             raise ValueError("required_tools must exactly describe the planned tool call")
         return self

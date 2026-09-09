@@ -10,6 +10,7 @@ from app.orchestration.models import (
     OrchestrationTermination,
     PlanTask,
     TaskExecution,
+    TaskExecutionKind,
     TaskStatus,
     ToolEvidence,
     WorkingMemory,
@@ -90,21 +91,13 @@ class ExecutorAgent:
         repeated_calls: dict[str, int],
         side_effect_calls: set[str],
     ) -> ExecutionOutcome:
+        if task.execution_kind != TaskExecutionKind.TOOL or task.tool_call is None:
+            raise ExecutorError(
+                OrchestrationTermination.INVALID_PLAN,
+                "The task has no registered executable handler",
+            )
         task.attempts += 1
         task.status = TaskStatus.RUNNING
-        if task.tool_call is None:
-            task.status = TaskStatus.COMPLETED
-            task.result = {"ok": True, "data": {"objective_completed": True}}
-            evidence = ToolEvidence(task_id=task.task_id, ok=True, data=task.result["data"])
-            return ExecutionOutcome(
-                task=task,
-                evidence=evidence,
-                execution=TaskExecution(
-                    task_id=task.task_id,
-                    status=task.status,
-                    attempt=task.attempts,
-                ),
-            )
 
         call = task.tool_call
         if call.name not in self._tool_names:

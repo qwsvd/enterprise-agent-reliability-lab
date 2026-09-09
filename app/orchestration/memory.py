@@ -12,8 +12,39 @@ from app.orchestration.models import EpisodeSummary, WorkingMemory
 
 
 _TOKENS = re.compile(r"[a-z0-9]+", re.IGNORECASE)
+_EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
+_COMPACT_BUSINESS_ID = re.compile(
+    r"\b(?:CUS|ORD|SHP|SHIP|TRK|TRACK|REF|TKT)[_-][A-Z0-9][A-Z0-9_-]*\b",
+    re.IGNORECASE,
+)
+_LABELLED_SENSITIVE_ID = re.compile(
+    r"\b(?:customer|order|shipment|shipping|tracking|refund|ticket|account|passport|ssn)"
+    r"\s+(?:code|id|number|no\.?)\s*[:#-]?\s*[A-Z0-9][A-Z0-9_-]{2,}\b",
+    re.IGNORECASE,
+)
+_TRACKING_LIKE_ID = re.compile(r"\b[A-Z]{2,5}-\d{8,}\b", re.IGNORECASE)
+_CREDENTIAL_LIKE_ID = re.compile(r"\b(?:sk|pk|api)[_-][A-Z0-9_-]{12,}\b", re.IGNORECASE)
+_PHONE = re.compile(r"(?<![\w])(?:\+?\d[\d().\s-]{6,}\d)(?![\w])")
 _STOP_WORDS = frozenset(
-    {"a", "an", "and", "for", "has", "is", "of", "on", "the", "to", "with"}
+    {
+        "a",
+        "an",
+        "and",
+        "business",
+        "email",
+        "for",
+        "has",
+        "id",
+        "is",
+        "of",
+        "on",
+        "phone",
+        "redacted",
+        "sensitive",
+        "the",
+        "to",
+        "with",
+    }
 )
 _SAFE_EVIDENCE_KEYS = frozenset(
     {
@@ -57,6 +88,18 @@ def keywords(value: str) -> set[str]:
     }
 
 
+def sanitize_episode_text(value: str) -> str:
+    """Redact sensitive values before any episode field reaches persistence."""
+
+    sanitized = _EMAIL.sub("[redacted-email]", value)
+    sanitized = _LABELLED_SENSITIVE_ID.sub("[redacted-business-id]", sanitized)
+    sanitized = _COMPACT_BUSINESS_ID.sub("[redacted-business-id]", sanitized)
+    sanitized = _TRACKING_LIKE_ID.sub("[redacted-business-id]", sanitized)
+    sanitized = _CREDENTIAL_LIKE_ID.sub("[redacted-sensitive-id]", sanitized)
+    sanitized = _PHONE.sub("[redacted-phone]", sanitized)
+    return " ".join(sanitized.split())
+
+
 def _safe_evidence(memory: WorkingMemory) -> list[dict[str, Any]]:
     summaries: list[dict[str, Any]] = []
     for item in memory.tool_evidence:
@@ -93,8 +136,9 @@ class EpisodicMemoryStore:
         outcome: str,
         termination_reason: str,
     ) -> EpisodeSummary:
+        sanitized_goal = sanitize_episode_text(memory.goal)
         plan_summary = (
-            [task.objective for task in memory.current_plan.tasks]
+            [sanitize_episode_text(task.objective) for task in memory.current_plan.tasks]
             if memory.current_plan is not None
             else []
         )
@@ -103,8 +147,8 @@ class EpisodicMemoryStore:
         created_at = datetime.now(UTC)
         row = EpisodeRow(
             run_id=run_id,
-            goal=memory.goal,
-            keywords_json=json.dumps(sorted(keywords(memory.goal))),
+            goal=sanitized_goal,
+            keywords_json=json.dumps(sorted(keywords(sanitized_goal))),
             plan_json=json.dumps(plan_summary, sort_keys=True),
             evidence_json=json.dumps(evidence_summary, sort_keys=True, default=str),
             outcome=outcome,
@@ -117,7 +161,7 @@ class EpisodicMemoryStore:
             session.commit()
         return EpisodeSummary(
             run_id=run_id,
-            goal=memory.goal,
+            goal=sanitized_goal,
             outcome=outcome,
             termination_reason=termination_reason,
             plan_summary=plan_summary,
@@ -131,7 +175,7 @@ class EpisodicMemoryStore:
             raise ValueError("Memory retrieval limit cannot be negative")
         if limit == 0:
             return []
-        query_terms = keywords(goal)
+        query_terms = keywords(sanitize_episode_text(goal))
         with self.sessions() as session:
             rows = list(session.scalars(select(EpisodeRow).order_by(EpisodeRow.id.desc())))
         ranked: list[tuple[int, EpisodeRow]] = []
@@ -148,13 +192,17 @@ class EpisodicMemoryStore:
         created_at = row.created_at
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=UTC)
+        plan_summary = [
+            sanitize_episode_text(str(objective))
+            for objective in json.loads(row.plan_json)
+        ]
         return EpisodeSummary(
             run_id=row.run_id,
-            goal=row.goal,
+            goal=sanitize_episode_text(row.goal),
             outcome=row.outcome,
             termination_reason=row.termination_reason,
             score=score,
-            plan_summary=json.loads(row.plan_json),
+            plan_summary=plan_summary,
             evidence_summary=json.loads(row.evidence_json),
             reflection_summary=json.loads(row.reflections_json),
             created_at=created_at,
