@@ -119,7 +119,7 @@ _HOME_PAGE = """<!doctype html>
 
     .flow {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 0.75rem;
       margin: 1.6rem 0 0;
       padding: 0;
@@ -204,7 +204,7 @@ _HOME_PAGE = """<!doctype html>
     <div class="shell">
       <p class="eyebrow">Reference system / after-sales operations</p>
       <h1>Enterprise Agent Reliability Lab</h1>
-      <p class="lede">Production-oriented reference implementation for building, evaluating, and operating reliable enterprise AI agents across business state, tool protocols, failure controls, traces, and regression evaluation.</p>
+      <p class="lede">Production-oriented reference implementation for building, evaluating, and operating reliable enterprise AI agents across planning, memory, tool protocols, failure controls, traces, and regression evaluation.</p>
       <span class="release">v__APP_VERSION__</span>
       <nav class="actions" aria-label="Project links">
         <a class="button primary" href="/docs">API Docs</a>
@@ -220,12 +220,13 @@ _HOME_PAGE = """<!doctype html>
     <section aria-labelledby="architecture-title">
       <p class="eyebrow">Implemented execution path</p>
       <h2 id="architecture-title">Architecture</h2>
-      <p class="section-intro">A customer-service task moves through bounded Agent execution and dynamically discovered tools. Workflow guidance stays separate from executable capabilities, while the service layer remains authoritative.</p>
+      <p class="section-intro">The project keeps its bounded Single-Agent reference path and adds a real LangGraph multi-agent path. Planner, dependency scheduler, Executor, and evidence Reviewer collaborate through typed working state while the service layer remains authoritative.</p>
       <ol class="flow">
-        <li>User task<br>AgentRuntime<br>provider abstraction</li>
-        <li>Reliability policy<br>selected Agent Skill<br>validated tool call</li>
-        <li>MCP client/server<br>FastAPI services<br>SQLAlchemy + SQLite</li>
-        <li>Structured result<br>OpenTelemetry trace<br>eval regression gate</li>
+        <li>User goal<br>episodic memory<br>Planner Agent</li>
+        <li>TaskPlan DAG<br>dependency scheduler<br>ready task</li>
+        <li>Executor Agent<br>Agent Skill<br>MCP client/server</li>
+        <li>Reviewer Agent<br>reflection<br>bounded replan</li>
+        <li>Service + SQLite<br>OpenTelemetry<br>eval gate</li>
       </ol>
     </section>
 
@@ -234,7 +235,9 @@ _HOME_PAGE = """<!doctype html>
       <h2 id="capabilities-title">Implemented capabilities</h2>
       <div class="grid">
         <article class="card"><h3>Enterprise backend</h3><p>FastAPI, typed Pydantic contracts, SQLAlchemy persistence, SQLite demo state, refund idempotency, and human-approval semantics.</p></article>
-        <article class="card"><h3>Agent runtime</h3><p>Provider-neutral LLM tool-calling loop with validated arguments, structured errors, bounded steps, and an offline ScriptedProvider.</p></article>
+        <article class="card"><h3>Agent runtime</h3><p>Provider-neutral <code>AgentRuntime</code> tool-calling loop with validated arguments, structured errors, bounded steps, and an offline ScriptedProvider.</p></article>
+        <article class="card"><h3>LangGraph orchestration</h3><p>Typed Planner, dependency-aware Scheduler, Executor, and Reviewer nodes with conditional handoffs, reflection, and bounded replanning.</p></article>
+        <article class="card"><h3>Working + episodic memory</h3><p>Explicit run state plus persistent SQLite episodes with bounded deterministic retrieval that informs later planning context.</p></article>
         <article class="card"><h3>MCP integration</h3><p>Official-SDK MCP server and client with dynamic tools/list discovery and tools/call execution over in-process or stdio transport.</p></article>
         <article class="card"><h3>Agent Skills</h3><p>Repository SKILL.md workflows, metadata-first discovery, progressive disclosure, and explicit on-demand loading.</p></article>
         <article class="card"><h3>OpenTelemetry tracing</h3><p>Vendor-neutral run, step, model, retry, Skill, MCP, and tool spans with payload-safe operational attributes.</p></article>
@@ -252,6 +255,7 @@ _HOME_PAGE = """<!doctype html>
             <li>Model, tool-call, and Agent-step budgets</li>
             <li>Bounded retries and typed timeouts</li>
             <li>Repeated-call and consecutive-failure protection</li>
+            <li>Bounded orchestration, reflection, and replanning</li>
             <li>Explicit terminal failure reasons</li>
           </ul>
         </article>
@@ -270,7 +274,7 @@ _HOME_PAGE = """<!doctype html>
     <section aria-labelledby="evaluation-title">
       <p class="eyebrow">Deterministic verification</p>
       <h2 id="evaluation-title">Agent evaluation</h2>
-      <p class="section-intro">Versioned, offline end-to-end cases exercise AgentRuntime, Skills, MCP, service state, reliability, and tracing. Typed metrics check final outcomes, tool selection and sequence, arguments, persisted side effects, human approval, retries, termination reasons, and unsupported claims. Regression gates fail when expected behavior degrades.</p>
+      <p class="section-intro">Versioned, offline end-to-end cases exercise both Single-Agent and Multi-Agent paths, Skills, MCP, service state, reliability, memory, reflection, replanning, and tracing. Typed metrics check plans, dependencies, final outcomes, tool execution, persisted side effects, human approval, termination reasons, and unsupported claims. Regression gates fail when expected behavior degrades.</p>
     </section>
 
     <section aria-labelledby="delivery-title">
@@ -280,6 +284,12 @@ _HOME_PAGE = """<!doctype html>
         <article class="card"><h3>Docker</h3><p>Multi-stage Python image, non-root runtime, writable SQLite boundary under /data, environment-aware port binding, and a live health check.</p></article>
         <article class="card"><h3>GitHub Actions</h3><p>Pull-request and main-branch validation across supported Python versions, full pytest, dependency and package checks, then a production image build.</p></article>
       </div>
+    </section>
+
+    <section aria-labelledby="demo-title">
+      <p class="eyebrow">No-key execution proof</p>
+      <h2 id="demo-title">Run the deterministic multi-agent demo</h2>
+      <p class="section-intro">Install the repository locally and run <code>after-sales-multi-agent-demo --format json</code>. The command executes the LangGraph plan, Skill loading, MCP business tools, memory retrieval, review, tracing, and a measured Single-Agent comparison without an API key or production side effects.</p>
     </section>
 
     <section aria-labelledby="links-title">
@@ -296,7 +306,7 @@ _HOME_PAGE = """<!doctype html>
   </main>
 
   <footer class="shell">
-    <p>Enterprise Agent Reliability Lab v__APP_VERSION__ · Single-Agent reliability reference project · No JavaScript or external presentation assets.</p>
+    <p>Enterprise Agent Reliability Lab v__APP_VERSION__ · Single-Agent and LangGraph multi-agent reference paths · No JavaScript or external presentation assets.</p>
   </footer>
 </body>
 </html>

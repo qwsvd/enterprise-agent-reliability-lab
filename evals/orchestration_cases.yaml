@@ -1,0 +1,80 @@
+schema_version: "1.0"
+suite_id: multi-agent-orchestration-v1
+thresholds:
+  minimum_case_pass_rate: 1.0
+  minimum_metric_pass_rate: 1.0
+  maximum_failed_cases: 0
+cases:
+  - schema_version: "1.0"
+    id: multi-agent-delayed-order
+    name: Multi-agent delayed-order resolution
+    goal: The customer says order ORD-1024 has still not arrived after 10 days. Resolve the issue according to the appropriate operational workflow.
+    setup:
+      order_amount: 299.00
+    fault: none
+    expected:
+      status: completed
+      termination_reason: completed
+      refund_status: approved
+      refund_completed: true
+      refund_count: 1
+      ticket_count: 1
+      reflections: 0
+      replans: 0
+      required_tools: [load_skill, get_order, get_customer, get_shipping, get_refund_policy, create_refund, create_support_ticket]
+
+  - schema_version: "1.0"
+    id: multi-agent-high-value
+    name: Multi-agent high-value approval accuracy
+    goal: Resolve delayed order ORD-1024 and report the refund approval state accurately.
+    setup:
+      order_amount: 1500.00
+    fault: none
+    expected:
+      status: completed
+      termination_reason: completed
+      refund_status: pending_human_approval
+      refund_completed: false
+      refund_count: 1
+      ticket_count: 1
+      reflections: 0
+      replans: 0
+      required_tools: [load_skill, get_order, get_customer, get_shipping, get_refund_policy, create_refund, create_support_ticket]
+
+  - schema_version: "1.0"
+    id: multi-agent-reflection-recovery
+    name: Reflection and replanning recovery
+    goal: Resolve delayed order ORD-1024 despite a transient shipping lookup failure.
+    setup:
+      order_amount: 299.00
+    fault: transient_shipping
+    expected:
+      status: completed
+      termination_reason: completed
+      refund_status: approved
+      refund_completed: true
+      refund_count: 1
+      ticket_count: 1
+      reflections: 1
+      replans: 1
+      required_tools: [load_skill, get_order, get_customer, get_shipping, get_refund_policy, create_refund, create_support_ticket]
+
+  - schema_version: "1.0"
+    id: multi-agent-replan-budget
+    name: Bounded replan termination
+    goal: Resolve delayed order ORD-1024 when shipping lookup remains unavailable.
+    setup:
+      order_amount: 299.00
+    fault: persistent_shipping
+    reliability:
+      max_replans: 1
+    expected:
+      status: failed
+      termination_reason: max_replans_exceeded
+      refund_status: null
+      refund_completed: null
+      refund_count: 0
+      ticket_count: 0
+      reflections: 2
+      replans: 1
+      required_tools: [load_skill, get_order, get_customer, get_shipping]

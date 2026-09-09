@@ -10,6 +10,10 @@
   external benchmark boundary and τ³ adapter in `app/benchmarks/`. Phase 9 adds a
   multi-stage, non-root FastAPI image and GitHub Actions validation. Phase 10 adds
   the final reviewer-oriented documentation and deterministic integrated demo.
+- Version 1.1 adds a separate official-LangGraph orchestration path in
+  `app/orchestration/` with typed planning, dependency scheduling, Executor and
+  Reviewer roles, working/episodic memory, reflection, bounded replanning, evals,
+  and Single-Agent comparison. Preserve the original `AgentRuntime` as a baseline.
 - Keep routes in `app/api.py`, contracts in `app/schemas.py`, persistence in `app/models.py`, and business rules in `app/services.py`.
 - Add pytest coverage for every behavior change and use `Decimal` for money.
 - Preserve refund idempotency. Never add secrets, local databases, caches, or fabricated results.
@@ -53,6 +57,13 @@
   service behavior.
 - Keep README commands synchronized with real project scripts and test them before
   documenting results.
-- Do not add RAG, multi-agent systems, a frontend, cloud deployment, or unrelated
+- Multi-Agent Executors must use the existing AgentTools/MCP/service boundary.
+  Planner and Reviewer nodes never write business state directly.
+- Keep orchestration state, plans, reviews, reflections, counters, and termination
+  reasons typed. Scheduling must be dependency-driven and reject invalid graphs.
+- Persist episodic memory separately from business state, use bounded deterministic
+  retrieval, and never claim vector or semantic memory without an embedding model.
+- Keep LangGraph tracing payload-free and orchestration retries/replans bounded.
+- Do not add RAG, a frontend, additional cloud deployment, or unrelated
   infrastructure.
 - Preserve third-party licenses and attribution when reusing external code.

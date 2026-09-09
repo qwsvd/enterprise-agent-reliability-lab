@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -73,7 +74,24 @@ def test_ci_covers_supported_python_and_pins_actions() -> None:
     assert "python -m pytest" in workflow_text
     assert "python -m pip check" in workflow_text
     assert "docker build --pull" in workflow_text
+    assert "MultiAgentOrchestrator" in workflow_text
 
     action_refs = re.findall(r"uses: [^@\s]+@([^\s]+)", workflow_text)
     assert action_refs
     assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for ref in action_refs)
+
+
+def test_multi_agent_dependency_scripts_and_attribution_are_delivered() -> None:
+    with (ROOT / "pyproject.toml").open("rb") as stream:
+        project = tomllib.load(stream)["project"]
+
+    assert "langgraph>=1.2,<2.0" in project["dependencies"]
+    assert project["scripts"]["after-sales-multi-agent-demo"] == (
+        "app.orchestration.demo:main"
+    )
+    assert project["scripts"]["after-sales-multi-agent-eval"] == (
+        "app.orchestration.eval_cli:main"
+    )
+    notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    assert "## LangGraph" in notices
+    assert "MIT License" in notices
