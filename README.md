@@ -6,8 +6,8 @@
 **[API Docs](https://enterprise-agent-reliability-lab.onrender.com/docs)** ·
 **[Health](https://enterprise-agent-reliability-lab.onrender.com/health)** ·
 **[GitHub Actions](https://github.com/qwsvd/enterprise-agent-reliability-lab/actions)** ·
-**Source version 1.1.0** ·
-**[Published Release v1.0.1](https://github.com/qwsvd/enterprise-agent-reliability-lab/releases/tag/v1.0.1)**
+**Source version 1.2.0** ·
+**[Published Release v1.2.0](https://github.com/qwsvd/enterprise-agent-reliability-lab/releases/tag/v1.2.0)**
 
 A production-oriented reference implementation of an enterprise after-sales AI Agent:
 typed business APIs, LLM tool calling, MCP discovery, progressively loaded Agent
