@@ -16,6 +16,31 @@ from app.orchestration.models import PlannerContext, ToolEvidence, WorkingMemory
 from app.orchestration.planner import PlanningError, ProviderPlanner
 from app.orchestration.reviewer import has_unsupported_claim
 from app.orchestration.scenarios import build_delayed_order_plan
+from app.schemas import TicketCreate
+from app.services import create_ticket
+
+
+def test_existing_ticket_blocks_a_second_subject(tmp_path):
+    path = tmp_path / "db"
+    fixture(path, {"id": "normal"})
+    db = Database("sqlite:///" + path.as_posix())
+    args = {
+        "order_code": "ORD-1024",
+        "customer_code": "CUS-001",
+        "subject": "Missing shipment",
+        "description": "Please inspect shipment.",
+    }
+    try:
+        with db.session_factory() as session:
+            create_ticket(session, TicketCreate(**args))
+        boundary = Boundary(None, db, "ticket", "none")
+        result = boundary.execute(
+            "create_support_ticket", {**args, "subject": "Follow up"}
+        )
+        assert result["error"]["type"] == "authority_or_duplicate"
+        assert len(snapshot(db)["tickets"]) == 1
+    finally:
+        db.dispose()
 
 
 def test_unrelated_status_cannot_approve_refund():
@@ -49,7 +74,7 @@ def test_invalid_decision(raw):
         parse_reply(raw, [{"function": {"name": "get_order"}}])
 
 
-@pytest.mark.parametrize("quota", [False, True])
+@pytest.mark.parametrize("quota", [False, True, "native_tool"])
 def test_native_transport_without_network(monkeypatch, quota):
     p = CodexProvider.__new__(CodexProvider)
     p.cap, p.stopped, p.records, p.cli, p.env, p.version, p.model = (
@@ -71,6 +96,8 @@ def test_native_transport_without_network(monkeypatch, quota):
             if quota
             else "import pathlib,json; pathlib.Path('decision.txt').write_text('{}'); print(json.dumps({'type':'turn.completed','usage':{'input_tokens':13}}))"
         )
+        if quota == "native_tool":
+            code = """print('{"type":"item.started","item":{"type":"command_execution"}}')"""
         return original(
             [sys.executable, "-c", "import sys; sys.stdin.read(); " + code], **kwargs
         )
@@ -79,7 +106,9 @@ def test_native_transport_without_network(monkeypatch, quota):
     if quota:
         with pytest.raises(ProviderError):
             p.complete([], [])
-        assert p.stopped and p.records[0]["error"] == "account_stop"
+        assert p.stopped and p.records[0]["error"] == (
+            "transport_stop" if quota == "native_tool" else "account_stop"
+        )
     else:
         assert p.complete([], []).content == "{}"
         assert p.records[0]["usage"] == {"input_tokens": 13}

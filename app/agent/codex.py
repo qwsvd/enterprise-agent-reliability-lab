@@ -183,6 +183,20 @@ class CodexProvider:
                                 continue
                             if not isinstance(event, dict):
                                 continue
+                            item = event.get("item")
+                            if isinstance(item, dict) and item.get("type") in {
+                                "command_execution",
+                                "file_change",
+                                "mcp_tool_call",
+                                "web_search",
+                                "collab_tool_call",
+                            }:
+                                self.stopped = True
+                                proc.kill()
+                                raise ProviderError(
+                                    "Unexpected native tool activity",
+                                    kind="transport_stop",
+                                )
                             if event.get("type") == "turn.completed":
                                 usage = event.get("usage") or {}
                                 record["usage"] = {
