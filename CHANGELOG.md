@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.2.0
+
+- Added an opt-in Codex CLI decision provider, shared business permission and evidence checks, and replayable matched workflow evaluations.
+- Preserved all 48 preflight, 48 final scripted and six real workflow records. The real pilot includes two rejected replans.
+- Added a Windows CI job, offline replay and a scorecard derived from the archived rows. See the [experiment](experiments/v1.2/findings.md).
+
 ## [1.1.0] - 2026-09-09
 
 ### Added
