@@ -22,13 +22,17 @@ env:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python-version: "3.14"
 
     steps:
       - name: Check out repository
@@ -59,6 +63,12 @@ jobs:
 
       - name: Build wheel
         run: python -m pip wheel --no-deps --wheel-dir dist .
+
+      - name: Replay archived decisions with fresh databases
+        run: python -m app.evals.workflow replay experiments/v1.2/live.jsonl
+
+      - name: Recompute published measures
+        run: python -c "from pathlib import Path; from app.evals.workflow_report import render; assert Path('experiments/v1.2/scorecard.md').read_text(encoding='utf-8') == render()"
 
   container:
     name: Production container

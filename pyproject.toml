@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "enterprise-agent-reliability-lab"
-version = "1.1.0"
+version = "1.2.0"
 description = "Production-oriented single- and multi-agent reliability reference implementation"
 readme = "README.md"
 requires-python = ">=3.11"

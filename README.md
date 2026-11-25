@@ -6,14 +6,20 @@
 **[API Docs](https://enterprise-agent-reliability-lab.onrender.com/docs)** ·
 **[Health](https://enterprise-agent-reliability-lab.onrender.com/health)** ·
 **[GitHub Actions](https://github.com/qwsvd/enterprise-agent-reliability-lab/actions)** ·
-**Source version 1.1.0** ·
-**[Published Release v1.0.1](https://github.com/qwsvd/enterprise-agent-reliability-lab/releases/tag/v1.0.1)**
+**Source version 1.2.0** ·
+**[Published Release v1.2.0](https://github.com/qwsvd/enterprise-agent-reliability-lab/releases/tag/v1.2.0)**
 
 A production-oriented reference implementation of an enterprise after-sales AI Agent:
 typed business APIs, LLM tool calling, MCP discovery, progressively loaded Agent
 Skills, official-LangGraph multi-agent orchestration, working and episodic memory,
 reflection and bounded replanning, reliability controls, OpenTelemetry traces,
 deterministic regression evals, an external τ³-bench adapter, and Docker/CI delivery.
+
+### v1.2 matched workflow experiment
+
+On two frozen synthetic orders, the single-agent runtime met both expectations. Each LangGraph configuration met one. All three correctly requested human approval on the high-value order. The graph planners returned invalid revisions after a transient read failure. Twelve real CLI calls were recorded. Reproduce all six outcomes offline with `python -m app.evals.workflow replay experiments/v1.2/live.jsonl` after installing the package from this checkout. The pilot tests two workflows with a single model-driven decision role per architecture.
+
+[Research report](experiments/v1.2/findings.md) · [Computed scorecard](experiments/v1.2/scorecard.md) · [中文入门与面试展示](experiments/v1.2/learning.zh-CN.md)
 
 > **Scenario:** Customer `CUS-001` reports that order `ORD-1024`—a `299.00 CNY`
 > shipment delayed by 10 days—has not arrived. The Agent inspects customer, order,

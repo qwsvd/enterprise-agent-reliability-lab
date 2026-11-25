@@ -120,6 +120,10 @@ class ProviderPlanner:
         if response.tool_calls or not response.content:
             raise PlanningError("Planner response must contain only a TaskPlan JSON object")
         try:
-            return TaskPlan.model_validate_json(response.content)
+            plan = TaskPlan.model_validate_json(response.content)
+            if any(task.status.value != "pending" or task.attempts or task.result is not None
+                   or task.failure_reason is not None for task in plan.tasks):
+                raise ValueError("Execution state belongs to the executor")
+            return plan
         except (ValidationError, ValueError) as exc:
             raise PlanningError("Planner returned invalid structured output") from exc

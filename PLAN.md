@@ -1,5 +1,9 @@
 # Delivery plan
 
+## Workflow architecture research
+
+The [v1.2 pilot](experiments/v1.2/findings.md) compares online decisions with generated dependency plans. The next study should separate proposed changes from executor-owned fields, then test memory retrieval with identical replan limits on a fresh frozen set.
+
 Completed:
 
 1. Phase 1: local enterprise after-sales business backend

@@ -76,7 +76,7 @@ def test_package_and_application_versions_are_synchronized() -> None:
     with (ROOT / "pyproject.toml").open("rb") as stream:
         project = tomllib.load(stream)["project"]
 
-    assert project["version"] == __version__ == "1.1.0"
+    assert project["version"] == __version__ == "1.2.0"
 
 
 def test_readme_public_links_and_release_are_visible_at_the_top() -> None:
@@ -88,4 +88,4 @@ def test_readme_public_links_and_release_are_visible_at_the_top() -> None:
     assert "https://enterprise-agent-reliability-lab.onrender.com/docs" in header
     assert "https://enterprise-agent-reliability-lab.onrender.com/health" in header
     assert "https://github.com/qwsvd/enterprise-agent-reliability-lab/actions" in header
-    assert "Release v1.0.1" in header
+    assert "Release v1.2.0" in header

@@ -37,7 +37,12 @@ def _refund_status(memory: WorkingMemory) -> str | None:
     for evidence in reversed(memory.tool_evidence):
         if not evidence.ok:
             continue
-        status = evidence.data.get("refund_status") or evidence.data.get("status")
+        field = {"get_order": "refund_status", "create_refund": "status"}.get(
+            evidence.tool_name
+        )
+        if field is None:
+            continue
+        status = evidence.data.get(field)
         if status in {"approved", "pending_human_approval"}:
             return str(status)
     return None
